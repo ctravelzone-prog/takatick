@@ -340,33 +340,39 @@ async function loadSettings(){
   if(!s.ok){ document.getElementById('settingsBody').innerHTML = '<p class="muted">' + esc(s.error || 'Failed to load settings') + '</p>'; return; }
   const st = cache.stats || (await api('/api/admin/stats')).stats;
   cache.stats = st;
-  const src = s.sellerBkashSource === 'admin' ? 'admin panel theke set' : s.sellerBkashSource === 'env' ? 'Render env var theke' : 'default';
+  const nums = s.sellerNumbers || {};
+  const srcs = s.sellerNumberSources || {};
+  const srcLabel = v => v === 'admin' ? 'admin panel theke set' : v === 'env' ? 'Render env var theke' : v === 'default' ? 'default' : 'set kora nei';
+  const labels = {bkash:'bKash', nagad:'Nagad', rocket:'Rocket', upay:'Upay'};
+  const row = m => `<label>${labels[m]} number <input id="seller-${m}" type="tel" value="${esc(nums[m] || '')}" placeholder="01XXXXXXXXX" style="width:180px"></label> <span class="muted">Source: ${esc(srcLabel(srcs[m]))}</span><br>`;
   document.getElementById('settingsBody').innerHTML = `
     <p>Brand: <strong>${esc(p.brand)}</strong><br>
     Currency: <strong>BDT</strong><br>
     Grace period: <strong>${p.graceDays} days</strong> (editable in the Packages section)<br>
     Packages: <strong>${(p.packages || []).map(x => esc(x.name) + ' ৳' + x.priceBDT + '/mo').join(' · ')}</strong></p>
-    <h3>Seller bKash number</h3>
-    <p class="muted">Package kenar taka ei number-e asbe — enroll page-e eitai dekhay. Source: ${esc(src)}.</p>
-    <label>Seller bKash number <input id="sellerBkashInput" type="tel" value="${esc(s.sellerBkash)}" style="width:180px"></label>
-    <button onclick="saveSellerBkash()">Save</button>
-    <button onclick="resetSellerBkash()" class="outline">Reset to env</button>
+    <h3>Seller numbers (package kenar taka)</h3>
+    <p class="muted">Buyer je method-e pay korbe, enroll page-e sei method-er number dekhabe. Khali thakle oi method offer hobe na.</p>
+    ${['bkash','nagad','rocket','upay'].map(row).join('')}
+    <button onclick="saveSellerNumbers()">Save</button>
+    <button onclick="resetSellerNumbers()" class="outline">Reset to env</button>
     <span id="sellerMsg" class="muted"></span>
-    <p class="muted"><small>Deploy-er por database muche gele Render env-er number-ta abar karjokor hobe — tokhon ekhane abar save korlei hobe.</small></p>`;
+    <p class="muted"><small>Deploy-er por database muche gele Render env-er number-gulo abar karjokor hobe — tokhon ekhane abar save korlei hobe.</small></p>`;
 }
-async function saveSellerBkash(){
-  const v = document.getElementById('sellerBkashInput').value.trim();
-  const o = await api('/api/admin/settings', {method:'POST', body: JSON.stringify({sellerBkash: v})});
+async function saveSellerNumbers(){
+  const body = {};
+  [['bkash','sellerBkash'],['nagad','sellerNagad'],['rocket','sellerRocket'],['upay','sellerUpay']].forEach(([m, f]) => { body[f] = document.getElementById('seller-' + m).value.trim(); });
+  const o = await api('/api/admin/settings', {method:'POST', body: JSON.stringify(body)});
   const m = document.getElementById('sellerMsg');
   if(!o.ok){ m.textContent = o.message || o.error || 'Failed'; return; }
-  m.textContent = 'Saved — enroll page-e ekhon ' + o.sellerBkash + ' dekhabe.';
+  const labels = {bkash:'bKash', nagad:'Nagad', rocket:'Rocket', upay:'Upay'};
+  m.textContent = 'Saved — enroll page-e ekhon ' + Object.keys(o.sellerNumbers || {}).map(k => labels[k] || k).join(', ') + ' dekhabe.';
   loadSettings();
 }
-async function resetSellerBkash(){
-  const o = await api('/api/admin/settings', {method:'POST', body: JSON.stringify({sellerBkash: ''})});
+async function resetSellerNumbers(){
+  const o = await api('/api/admin/settings', {method:'POST', body: JSON.stringify({sellerBkash:'', sellerNagad:'', sellerRocket:'', sellerUpay:''})});
   const m = document.getElementById('sellerMsg');
   if(!o.ok){ m.textContent = o.message || o.error || 'Failed'; return; }
-  m.textContent = 'Reset — ekhon Render env-er number (' + o.sellerBkash + ') karjokor.';
+  m.textContent = 'Reset — ekhon Render env-er number-gulo karjokor.';
   loadSettings();
 }
 

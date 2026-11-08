@@ -80,7 +80,7 @@ Tarpor browser-e dashboard khulun (default `http://localhost:3000` — `PORT` en
 | `JWT_SECRET` | Login JWT sign korar secret — strong random value dite hobe |
 | `BRAND_NAME` | Brand naam — default `TakaTick` (Siam-er decide kora brand; ek jayga theke bodlano jay) |
 | `DB_PATH` | SQLite database file-er path |
-| `SELLER_BKASH_NUMBER` | Buyer-ra je bKash number-e Send Money korbe — Siam-er number `01883042132` (public, landing page-e dekhano hoy; env-e na dile ei number-tai fallback). Admin panel → Settings thekeo bodlano jay (DB value env-ke override kore, deploy charai karjokor hoy) |
+| `SELLER_BKASH_NUMBER` | Buyer-ra je bKash number-e Send Money korbe — Siam-er number `01883042132` (public, landing page-e dekhano hoy; env-e na dile ei number-tai fallback). Admin panel → Settings thekeo bodlano jay (DB value env-ke override kore, deploy charai karjokor hoy). Aro method: `SELLER_NAGAD_NUMBER` / `SELLER_ROCKET_NUMBER` / `SELLER_UPAY_NUMBER` — je method-er number set thakbe, enroll page-e sudhu sei method-guloi offer hobe |
 | `ADMIN_EMAIL` | Admin panel login email — first boot-e admin account banay |
 | `ADMIN_PASSWORD` | Admin panel login password — strong password dite hobe; na dile admin login bondho thakbe (`ADMIN_NOT_CONFIGURED`) |
 

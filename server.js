@@ -50,13 +50,32 @@ function setSetting(key, value) {
 function clearSetting(key) {
   db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 }
+// v2.9.3: one receiving number per MFS method for the storefront (enroll).
+// bKash always has the fallback above; the other methods are offered only
+// when a number is set (admin Settings or env var).
+const SELLER_METHODS = ['bkash', 'nagad', 'rocket', 'upay'];
+function getSellerNumber(method) {
+  const fromDb = getSetting('seller_' + method + '_number');
+  if (fromDb) return fromDb;
+  if (method === 'bkash') return SELLER_BKASH_NUMBER;
+  return process.env['SELLER_' + method.toUpperCase() + '_NUMBER'] || '';
+}
+function getSellerNumbers() {
+  const out = {};
+  for (const m of SELLER_METHODS) { const n = getSellerNumber(m); if (n) out[m] = n; }
+  return out;
+}
+function sellerNumberSource(method) {
+  if (getSetting('seller_' + method + '_number')) return 'admin';
+  if (process.env['SELLER_' + method.toUpperCase() + '_NUMBER']) return 'env';
+  if (method === 'bkash') return 'default';
+  return '';
+}
 function getSellerBkash() {
-  return getSetting('seller_bkash_number') || SELLER_BKASH_NUMBER;
+  return getSellerNumber('bkash');
 }
 function sellerBkashSource() {
-  if (getSetting('seller_bkash_number')) return 'admin';
-  if (process.env.SELLER_BKASH_NUMBER) return 'env';
-  return 'default';
+  return sellerNumberSource('bkash');
 }
 const BKASH_NUMBER_RE = /^01[3-9]\d{8}$/;
 // Admin account: seeded from env on first boot (see ensureAdminSeeded).
@@ -351,6 +370,7 @@ app.get('/api/public/pricing', (_req, res) => {
     ok: true,
     brand: getBrand(),
     sellerBkash: getSellerBkash(),
+    sellerNumbers: getSellerNumbers(),
     graceDays: getGraceDays(),
     packages,
   });
@@ -441,22 +461,33 @@ function adminAuth(req, res, next) {
   }
 }
 
-// v2.9.2: admin-editable site settings.
+// v2.9.2: admin-editable site settings (v2.9.3: one number per MFS method).
 app.get('/api/admin/settings', adminAuth, (_req, res) => {
-  res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource() });
+  const sellerNumbers = getSellerNumbers();
+  const sellerNumberSources = {};
+  for (const m of SELLER_METHODS) sellerNumberSources[m] = sellerNumberSource(m);
+  res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource(), sellerNumbers, sellerNumberSources });
 });
 app.post('/api/admin/settings', adminAuth, (req, res) => {
-  const { sellerBkash } = req.body || {};
-  if (sellerBkash === '' || sellerBkash === null || sellerBkash === undefined) {
-    clearSetting('seller_bkash_number');
-    return res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource(), cleared: true });
+  const body = req.body || {};
+  const fields = { sellerBkash: 'bkash', sellerNagad: 'nagad', sellerRocket: 'rocket', sellerUpay: 'upay' };
+  for (const [field, method] of Object.entries(fields)) {
+    if (!(field in body)) continue;
+    const v = body[field];
+    if (v === '' || v === null || v === undefined) {
+      clearSetting('seller_' + method + '_number');
+      continue;
+    }
+    const num = String(v).trim();
+    if (!BKASH_NUMBER_RE.test(num)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_NUMBER', message: method + ' number 11 digit hote hobe, 01 diye shuru (e.g. 01883042132)' });
+    }
+    setSetting('seller_' + method + '_number', num);
   }
-  const num = String(sellerBkash).trim();
-  if (!BKASH_NUMBER_RE.test(num)) {
-    return res.status(400).json({ ok: false, error: 'INVALID_NUMBER', message: 'bKash number 11 digit hote hobe, 01 diye shuru (e.g. 01883042132)' });
-  }
-  setSetting('seller_bkash_number', num);
-  return res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource() });
+  const sellerNumbers = getSellerNumbers();
+  const sellerNumberSources = {};
+  for (const m of SELLER_METHODS) sellerNumberSources[m] = sellerNumberSource(m);
+  return res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource(), sellerNumbers, sellerNumberSources });
 });
 
 function adminMerchantRow(m) {

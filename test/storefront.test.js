@@ -102,6 +102,8 @@ test.before(async () => {
   process.env.ADMIN_EMAIL = ADMIN_EMAIL;
   process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
   process.env.SELLER_BKASH_NUMBER = SELLER_BKASH;
+  process.env.SELLER_NAGAD_NUMBER = '01883042132';
+  process.env.SELLER_UPAY_NUMBER = '01883042132';
 
   const { startServer } = require('../server');
   server = await startServer(0);
@@ -1029,4 +1031,15 @@ test('v2.9 buyer copy: landing page hides the mechanism (no SMS matching, no man
   assert.doesNotMatch(l.text, /TrxID \+ exact amount/);
   assert.doesNotMatch(l.text, /Admin approves/);
   assert.doesNotMatch(l.text, /checks your bKash payment/);
+});
+
+test('v2.9.3: enroll offers every seller method with a number (bKash/Nagad/Upay, no Rocket)', async () => {
+  const pricing = await req('/api/public/pricing');
+  assert.equal(pricing.status, 200);
+  assert.deepEqual(pricing.json.sellerNumbers, { bkash: '01883042132', nagad: '01883042132', upay: '01883042132' });
+  const enroll = await req('/enroll.html?plan=basic');
+  assert.equal(enroll.status, 200);
+  assert.match(enroll.text, /id="payMethods"/);
+  assert.match(enroll.text, /selectPayMethod/);
+  assert.match(enroll.text, /sellerNumbers/);
 });

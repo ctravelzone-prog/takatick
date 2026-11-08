@@ -109,15 +109,16 @@ label{font-size:14px;font-weight:600}
         <p style="color:#666;font-size:14px">You can change the plan before paying — the payment step always uses the plan selected here.</p>
       </div>
       <div id="payStep" style="display:none">
-        <h3 style="margin-top:0">Pay by bKash Send Money</h3>
-        <p>Send exactly <strong id="payAmount"></strong> to this bKash number (Send Money):</p>
-        <p><span class="paynum">{{SELLER_BKASH}}</span>
-        <button type="button" class="btn outline" onclick="navigator.clipboard.writeText('{{SELLER_BKASH}}');this.textContent='Copied!';">Copy number</button></p>
+        <h3 style="margin-top:0" id="payMethodTitle">Pay by bKash Send Money</h3>
+        <div id="payMethods" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0"></div>
+        <p>Send exactly <strong id="payAmount"></strong> to this <span id="payMethodName">bKash</span> number (Send Money):</p>
+        <p><span class="paynum" id="payNumber">{{SELLER_BKASH}}</span>
+        <button type="button" class="btn outline" id="payCopyBtn" onclick="copyPayNumber()">Copy number</button></p>
         <form id="orderForm">
           <label>Package</label><input id="orderPackage" readonly>
           <label>Amount (৳, exact)</label><input id="orderAmount" readonly>
-          <label>TrxID (from your bKash payment)</label><input name="trxid" required placeholder="e.g. 9AB12CD34E">
-          <label>Your bKash number (the number you paid from)</label><input name="sender" required placeholder="01XXXXXXXXX">
+          <label id="trxidLabel">TrxID (from your bKash payment)</label><input name="trxid" required placeholder="e.g. 9AB12CD34E">
+          <label id="senderLabel">Your bKash number (the number you paid from)</label><input name="sender" required placeholder="01XXXXXXXXX">
           <button class="btn" type="submit" style="width:100%">Submit TrxID</button>
         </form>
       </div>
@@ -166,6 +167,43 @@ function updatePayStep(){
   document.getElementById('payAmount').textContent = '৳' + p.priceBDT;
   document.getElementById('orderPackage').value = p.name + ' — ৳' + p.priceBDT + '/mo';
   document.getElementById('orderAmount').value = p.priceBDT;
+  renderPayMethods();
+  applyPayMethod();
+}
+// v2.9.3: the buyer picks a payment method — only the methods the seller
+// has a number for (from /api/public/pricing sellerNumbers) are offered.
+let selectedPayMethod = 'bkash';
+function sellerMethods(){
+  const nums = pricingData?.sellerNumbers || {};
+  const methods = Object.keys(nums);
+  return methods.length ? methods : ['bkash'];
+}
+function renderPayMethods(){
+  const methods = sellerMethods();
+  if(!methods.includes(selectedPayMethod)) selectedPayMethod = methods[0];
+  document.getElementById('payMethods').innerHTML = methods.map(m =>
+    `<button type="button" class="btn${m === selectedPayMethod ? '' : ' outline'}" onclick="selectPayMethod('${m}')" style="flex:1">${methodName(m)}</button>`).join('');
+}
+function applyPayMethod(){
+  const methods = sellerMethods();
+  if(!methods.includes(selectedPayMethod)) selectedPayMethod = methods[0];
+  const nums = pricingData?.sellerNumbers || {};
+  const name = methodName(selectedPayMethod);
+  document.getElementById('payMethodTitle').textContent = 'Pay by ' + name + ' Send Money';
+  document.getElementById('payMethodName').textContent = name;
+  document.getElementById('payNumber').textContent = nums[selectedPayMethod] || '';
+  document.getElementById('trxidLabel').textContent = 'TrxID (from your ' + name + ' payment)';
+  document.getElementById('senderLabel').textContent = 'Your ' + name + ' number (the number you paid from)';
+}
+function selectPayMethod(m){
+  selectedPayMethod = m;
+  renderPayMethods();
+  applyPayMethod();
+  setEnrollTitle('Pay by ' + methodName(m) + ' Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID.');
+}
+function copyPayNumber(){
+  navigator.clipboard.writeText(document.getElementById('payNumber').textContent);
+  document.getElementById('payCopyBtn').textContent = 'Copied!';
 }
 async function loadPricing(){
   const r = await fetch('/api/public/pricing');
@@ -227,7 +265,7 @@ function showPlanStep(){
 }
 function showPayStep(){
   updatePayStep();
-  setEnrollTitle('Pay by bKash Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID.');
+  setEnrollTitle('Pay by ' + methodName(selectedPayMethod) + ' Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID.');
   hideAllSteps();
   document.getElementById('payStep').style.display = 'block';
 }

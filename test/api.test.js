@@ -668,3 +668,27 @@ test('v2.9.2: admin can edit the seller bKash number (DB overrides env)', async 
   assert.equal(reset.json.sellerBkash, original);
   assert.notEqual(reset.json.sellerBkashSource, 'admin');
 });
+
+test('v2.9.3: admin can add Nagad/Upay seller numbers; pricing offers them', async () => {
+  const tok = await adminToken();
+  // Start: only bKash (fallback).
+  let pricing = await req('/api/public/pricing');
+  assert.deepEqual(pricing.json.sellerNumbers, { bkash: '01883042132' });
+  // Invalid Nagad -> 400, unchanged.
+  const bad = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerNagad: '123' } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.json.error, 'INVALID_NUMBER');
+  pricing = await req('/api/public/pricing');
+  assert.deepEqual(pricing.json.sellerNumbers, { bkash: '01883042132' });
+  // Add Nagad + Upay -> pricing offers them (Rocket stays absent).
+  const save = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerNagad: '01883042132', sellerUpay: '01883042132' } });
+  assert.equal(save.status, 200, JSON.stringify(save.json));
+  assert.deepEqual(save.json.sellerNumbers, { bkash: '01883042132', nagad: '01883042132', upay: '01883042132' });
+  pricing = await req('/api/public/pricing');
+  assert.deepEqual(pricing.json.sellerNumbers, { bkash: '01883042132', nagad: '01883042132', upay: '01883042132' });
+  // Clear them again -> back to bKash only.
+  const reset = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerNagad: '', sellerUpay: '' } });
+  assert.equal(reset.status, 200, JSON.stringify(reset.json));
+  pricing = await req('/api/public/pricing');
+  assert.deepEqual(pricing.json.sellerNumbers, { bkash: '01883042132' });
+});
