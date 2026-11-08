@@ -73,7 +73,7 @@ public class MainActivity extends Activity {
         });
 
         permBtn.setOnClickListener(v -> requestPermissions(
-                new String[]{Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS},
+                new String[]{Manifest.permission.RECEIVE_SMS},
                 1001
         ));
 
@@ -110,7 +110,7 @@ public class MainActivity extends Activity {
         if (checkSelfPermission(Manifest.permission.RECEIVE_SMS)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(
-                    new String[]{Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS},
+                    new String[]{Manifest.permission.RECEIVE_SMS},
                     1001
             );
         }
