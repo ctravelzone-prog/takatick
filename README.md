@@ -32,7 +32,7 @@ The root `/` is the TakaTick website: hero, features, how-it-works, pricing, FAQ
 <script src="https://takatick.onrender.com/takatick-embed.js"></script>
 ```
 
-`data-pay-key` is your pay key (dashboard &rarr; Pay link). `data-amount` is the price in BDT (leave it out and the buyer types the amount). The widget loads your registered methods with their MFS logos, shows the number to pay, takes the TrxID and verifies it automatically — the `payment.confirmed` webhook still fires, so your server can mark the order paid. Try it live at `/embed-demo.html` (paste any pay key + amount). The hosted pay page (`/pay/<payKey>`) shows the same logo selector, and the enroll page (buying a TakaTick package) uses the same UI for the seller's numbers.
+`data-pay-key` is your pay key (dashboard &rarr; Pay link). `data-amount` is the price in BDT (leave it out and the buyer types the amount). The widget loads your registered methods with their MFS logos, shows the number to pay, takes the TrxID and verifies it automatically — the `payment.confirmed` webhook still fires, so your server can mark the order paid. Try it live at `/embed-demo.html` (paste any pay key + amount). The hosted pay page (`/pay/<payKey>`) works the same way — method list, then a brand-coloured method page with Bangla instructions, the number and a VERIFY button; the enroll page (buying a TakaTick package) uses the same two-step flow.
 
 ## Project tree
 
