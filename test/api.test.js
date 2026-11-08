@@ -425,3 +425,15 @@ test('v2.2: keys + downloads locked until activation, issued on approve', async 
   assert.equal((await req('/download/app.apk', { token })).status, 200);
   assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip', { token })).status, 200);
 });
+
+test('v2.2.1: dashboard static HTML hides key buttons + download links by default', async () => {
+  const dash = await req('/dashboard.html');
+  assert.equal(dash.status, 200);
+  // Hidden until load() confirms the merchant has keys — no flash of
+  // download links or key buttons on first paint for a pending merchant.
+  assert.match(dash.text, /id="dlLinks" style="display:none"/);
+  assert.match(dash.text, /id="keysBtns" style="display:none"/);
+  // No key material in the static page at all.
+  assert.doesNotMatch(dash.text, /sk_live_/);
+  assert.doesNotMatch(dash.text, /pay_[0-9a-f]{16,}/);
+});
