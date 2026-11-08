@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "description": "TakaTick payment verification MVP: merchants verify bKash/Nagad/Rocket/Upay payments via SMS forwarding. Money goes to the merchant's own number; this system never holds money.",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "server.js",
+  "name": "payment-method-mvp",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "version": "1.0.0"
+}

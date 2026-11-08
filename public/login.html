@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login — {{BRAND}}</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:420px;margin:40px auto;padding:20px;background:#f7f7f7;color:#222}
+.card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+input{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
+button{width:100%;padding:11px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer;font-size:15px}
+#msg{color:#b00;min-height:1.2em}.muted{color:#666;font-size:13px}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>{{BRAND}}</h1>
+<p class="muted">Merchant login — bKash / Nagad / Rocket / Upay payment verification</p>
+<div id="msg"></div>
+<form id="loginForm">
+<label>Email</label><input name="email" type="email" required>
+<label>Password</label><input name="password" type="password" required>
+<button type="submit">Log in</button>
+</form>
+<hr>
+<h3>Sign up</h3>
+<form id="signupForm">
+<label>Name</label><input name="name" required>
+<label>Email</label><input name="email" type="email" required>
+<label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
+<label>Package</label>
+<select name="package" style="width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px">
+<option value="basic">Basic — ৳300/mo</option>
+<option value="standard">Standard — ৳600/mo</option>
+<option value="premium">Premium — ৳900/mo</option>
+</select>
+<button type="submit">Create account</button>
+</form>
+<p class="muted">On signup you get an API key, an app key and a pay link — shown once, save them.</p>
+</div>
+<script>
+const msg = document.getElementById('msg');
+function show(o){ msg.textContent = o.ok ? '' : (o.error || 'Failed'); }
+async function post(url, body){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  return r.json();
+}
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const o = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
+  if(o.ok){ localStorage.setItem('token', o.token); location.href='/dashboard.html'; } else show(o);
+});
+document.getElementById('signupForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: f.get('package')});
+  if(o.ok){
+    alert('Account created!\nAPI key: '+o.apiKey+'\nApp key: '+o.appKey+'\nPay key: '+o.payKey+'\nWebhook secret: '+o.webhookSecret+'\n\nSave these now — they are shown once.');
+    localStorage.setItem('token', ''); // login separately
+    msg.textContent = 'Account created. Please log in above.';
+  } else show(o);
+});
+</script>
+</body>
+</html>

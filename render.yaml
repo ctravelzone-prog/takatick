@@ -1,0 +1,19 @@
+# TakaTick — Render Blueprint (TEST preview, free tier)
+# Connect this repo in the Render dashboard once (New > Blueprint, pick repo),
+# or create the Web Service manually with the same settings.
+# Live preview only — test data, no real merchant credentials.
+services:
+  - type: web
+    name: takatick
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BRAND_NAME
+        value: TakaTick
+      - key: JWT_SECRET
+        generateValue: true

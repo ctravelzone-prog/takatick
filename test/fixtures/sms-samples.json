@@ -1,0 +1,109 @@
+[
+  {
+    "expected": {
+      "amountPoisha": 100000,
+      "method": "bkash",
+      "senderNumber": "01712345678",
+      "trxid": "9AB12CD34E"
+    },
+    "name": "bKash received, sender bKash",
+    "sender": "bKash",
+    "text": "You have received Tk 1,000.00 from 01712345678. TrxID: 9AB12CD34E. Your bKash balance is Tk 5,000.00."
+  },
+  {
+    "expected": {
+      "amountPoisha": 50050,
+      "method": "nagad",
+      "senderNumber": "01898765432",
+      "trxid": "NAGAD12345"
+    },
+    "name": "Nagad received, sender Nagad",
+    "sender": "Nagad",
+    "text": "You have received Tk 500.50 from 01898765432. TrxID: NAGAD12345. Your Nagad balance is Tk 2,500.00."
+  },
+  {
+    "expected": {
+      "amountPoisha": 25000,
+      "method": "bkash",
+      "senderNumber": "01911223344",
+      "trxid": "BKASH98765"
+    },
+    "name": "bKash via short code 16247, Trx ID with space",
+    "sender": "16247",
+    "text": "You have received Tk 250.00 from 01911223344. Trx ID: BKASH98765. Thank you for using bKash."
+  },
+  {
+    "expected": {
+      "amountPoisha": 1234575,
+      "method": "nagad",
+      "senderNumber": "01655556666",
+      "trxid": "NGD20261108"
+    },
+    "name": "Nagad via short code 16167, comma amount",
+    "sender": "16167",
+    "text": "You have received Tk 12,345.75 from 01655556666. Transaction ID: NGD20261108. Your Nagad balance is Tk 20,000.00."
+  },
+  {
+    "expected": {
+      "amountPoisha": 1000,
+      "method": "bkash",
+      "senderNumber": null,
+      "trxid": "SMALL0001"
+    },
+    "name": "bKash small amount, no sender number in text",
+    "sender": "bKash",
+    "text": "You have received Tk 10.00. TrxID: SMALL0001. Thank you for using bKash."
+  },
+  {
+    "expected": {
+      "error": "UNPARSEABLE"
+    },
+    "name": "unparseable — no amount or TrxID",
+    "sender": "bKash",
+    "text": "Your bKash account balance is Tk 5,000.00. Thank you."
+  },
+  {
+    "name": "Rocket received, sender Rocket",
+    "sender": "Rocket",
+    "text": "You have received Tk 750.00 from 01722223333. TrxID: ROCKET12345. Your Rocket balance is Tk 3,000.00.",
+    "expected": {
+      "method": "rocket",
+      "trxid": "ROCKET12345",
+      "amountPoisha": 75000,
+      "senderNumber": "01722223333"
+    }
+  },
+  {
+    "name": "Upay received, sender Upay",
+    "sender": "Upay",
+    "text": "You have received Tk 2,000.00 from 01933334444. TrxID: UPAY987654. Your Upay balance is Tk 4,500.00.",
+    "expected": {
+      "method": "upay",
+      "trxid": "UPAY987654",
+      "amountPoisha": 200000,
+      "senderNumber": "01933334444"
+    }
+  },
+  {
+    "name": "Rocket via short code 16216, comma amount",
+    "sender": "16216",
+    "text": "You have received Tk 1,250.50 from 01844445555. Transaction ID: RKT20261108. Thank you for using Rocket.",
+    "expected": {
+      "method": "rocket",
+      "trxid": "RKT20261108",
+      "amountPoisha": 125050,
+      "senderNumber": "01844445555"
+    }
+  },
+  {
+    "name": "Upay via short code 16268, Trx ID with space",
+    "sender": "16268",
+    "text": "You have received Tk 99.99 from 01677778888. Trx ID: UPAY000123. Thank you for using Upay.",
+    "expected": {
+      "method": "upay",
+      "trxid": "UPAY000123",
+      "amountPoisha": 9999,
+      "senderNumber": "01677778888"
+    }
+  }
+]

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — {{BRAND}}</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:900px;margin:0 auto;padding:20px;background:#f7f7f7;color:#222}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px}
+input,select{padding:9px;margin:4px;border:1px solid #ccc;border-radius:8px}
+button{padding:9px 14px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
+button.danger{background:#b00}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{border-bottom:1px solid #eee;padding:6px;text-align:left;overflow-wrap:anywhere}
+code{background:#eee;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
+#msg{color:#b00}
+</style>
+</head>
+<body>
+<h1>{{BRAND}} — Merchant dashboard</h1>
+<p><button onclick="logout()">Log out</button></p>
+<div id="msg"></div>
+<div class="card"><h2>Profile &amp; package</h2><div id="profile">Loading…</div></div>
+<div class="card"><h2>Keys &amp; pay link</h2><div id="keys"></div>
+<p><button onclick="regenKey()">Regenerate API key</button> <button onclick="showAppKey()">Show app key</button></p>
+<div id="appkey"></div></div>
+<div class="card"><h2>Payment numbers</h2>
+<form id="numForm"><select name="method"><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="upay">Upay</option></select>
+<input name="number" placeholder="01XXXXXXXXX" required><input name="label" placeholder="Label (optional)">
+<button>Add number</button></form><div id="numbers"></div></div>
+<div class="card"><h2>Websites</h2>
+<form id="siteForm"><input name="domain" placeholder="example.com" required><button>Add website</button></form><div id="websites"></div></div>
+<div class="card"><h2>Settings</h2>
+<form id="settingsForm">
+<label>Webhook URL</label><input name="webhook_url" style="width:80%" placeholder="https://example.com/webhook"><br>
+<label>Success URL</label><input name="success_url" style="width:80%" placeholder="https://example.com/success"><br>
+<label>Fail URL</label><input name="fail_url" style="width:80%" placeholder="https://example.com/fail"><br>
+<button>Save settings</button></form></div>
+<div class="card"><h2>Received SMS transactions</h2>
+<label>Method filter</label>
+<select id="txnFilter" onchange="renderTxns()"><option value="all">All methods</option><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="upay">Upay</option></select>
+<div id="txns"></div></div>
+<div class="card"><h2>Verifications</h2><div id="verifs"></div></div>
+<script>
+const token = localStorage.getItem('token');
+if(!token) location.href='/login.html';
+function logout(){ localStorage.removeItem('token'); location.href='/login.html'; }
+async function api(path, opts={}){
+  const r = await fetch(path, {...opts, headers:{'Content-Type':'application/json', Authorization:'Bearer '+token, ...(opts.headers||{})}});
+  return r.json();
+}
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function load(){
+  const p = await api('/api/me/profile');
+  if(!p.ok){ document.getElementById('msg').textContent = p.error || 'Session expired'; if(p.error==='UNAUTHORIZED') logout(); return; }
+  const m = p.merchant;
+  document.getElementById('profile').innerHTML =
+    `<p><strong>${esc(m.name)}</strong> — ${esc(m.email)}<br>Package: <strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo)<br>`+
+    `Methods: ${(p.package.methods||[]).join(', ')}<br>`+
+    `Verifications this month: ${p.usage.verificationsUsedThisMonth} / ${p.usage.verificationsLimit ?? 'unlimited'}</p>`;
+  document.getElementById('keys').innerHTML =
+    `<p>API key: <code>${esc(p.apiKeyMasked||'')}</code><br>App key: <code>${esc(p.appKeyMasked||'')}</code><br>`+
+    `Pay link: <code>${esc(location.origin)}/pay/${esc(m.pay_key)}</code></p>`;
+  document.querySelector('#settingsForm [name=webhook_url]').value = m.webhook_url||'';
+  document.querySelector('#settingsForm [name=success_url]').value = m.success_url||'';
+  document.querySelector('#settingsForm [name=fail_url]').value = m.fail_url||'';
+  const n = await api('/api/me/numbers');
+  document.getElementById('numbers').innerHTML = (n.numbers||[]).map(x=>
+    `<p>${esc(x.method)} — ${esc(x.number)} ${esc(x.label||'')} <button class="danger" onclick="delNum(${x.id})">Delete</button></p>`).join('') || '<p>No numbers yet.</p>';
+  const w = await api('/api/me/websites');
+  document.getElementById('websites').innerHTML = (w.websites||[]).map(d=>`<p>${esc(d)}</p>`).join('') || '<p>No websites yet.</p>';
+  const t = await api('/api/me/transactions');
+  window._txns = t.transactions || [];
+  renderTxns();
+  const v = await api('/api/me/verifications');
+  document.getElementById('verifs').innerHTML = '<table><tr><th>ID</th><th>Order</th><th>Amount</th><th>TrxID</th><th>Status</th><th>Created</th></tr>'+
+    (v.verifications||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.order_id||'')}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td>${esc(x.transaction_id)}</td><td>${esc(x.status)}</td><td>${esc(x.created_at)}</td></tr>`).join('')+'</table>';
+}
+function renderTxns(){
+  const filter = (document.getElementById('txnFilter')||{}).value || 'all';
+  const rows = (window._txns||[]).filter(x => filter === 'all' || x.method === filter);
+  document.getElementById('txns').innerHTML = '<table><tr><th>TrxID</th><th>Method</th><th>Amount</th><th>Sender</th><th>Status</th><th>Received</th></tr>'+
+    rows.map(x=>`<tr><td>${esc(x.trxid)}</td><td>${esc(x.method)}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td>${esc(x.sender||'')}</td><td>${esc(x.status)}</td><td>${esc(x.received_at||'')}</td></tr>`).join('')+'</table>';
+}
+async function regenKey(){ const o = await api('/api/me/api-key/regenerate',{method:'POST',body:'{}'}); if(o.ok) alert('New API key: '+o.apiKey+'\nOld key revoked. Save it now.'); load(); }
+async function showAppKey(){ const o = await api('/api/me/app-key'); document.getElementById('appkey').textContent = o.ok ? ('App key: '+o.appKey) : (o.error||'Failed'); }
+async function delNum(id){ await api('/api/me/numbers/'+id,{method:'DELETE'}); load(); }
+document.getElementById('numForm').addEventListener('submit', async e=>{ e.preventDefault(); const f=new FormData(e.target);
+  const o = await api('/api/me/numbers',{method:'POST',body:JSON.stringify({method:f.get('method'),number:f.get('number'),label:f.get('label')})});
+  if(!o.ok) alert(o.error||'Failed'); load(); });
+document.getElementById('siteForm').addEventListener('submit', async e=>{ e.preventDefault(); const f=new FormData(e.target);
+  const o = await api('/api/me/websites',{method:'POST',body:JSON.stringify({domain:f.get('domain')})});
+  if(!o.ok) alert(o.error||'Failed'); load(); });
+document.getElementById('settingsForm').addEventListener('submit', async e=>{ e.preventDefault(); const f=new FormData(e.target);
+  const o = await api('/api/me/settings',{method:'POST',body:JSON.stringify({webhook_url:f.get('webhook_url'),success_url:f.get('success_url'),fail_url:f.get('fail_url')})});
+  if(!o.ok) alert(o.error||'Failed'); else alert('Settings saved.'); load(); });
+load();
+</script>
+</body>
+</html>
