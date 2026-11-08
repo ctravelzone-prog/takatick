@@ -94,13 +94,20 @@ async function load(){
   // v2.5: expired merchants see everything frozen, like deactivated ones —
   // the forms below are disabled when `frozen` is true.
   const frozen = planOff || p.expiryState === 'expired';
+  // v2.6: a brand-new account bought nothing — show "No package yet", not
+  // the default Basic. What is waiting comes from the pending order, not
+  // from the signup-time default package.
+  const waitingPkg = p.expiryState === 'pending' ? p.waitingPackage : null;
+  const shownPkg = waitingPkg || (p.expiryState === 'pending' ? null : p.package);
   document.getElementById('profile').innerHTML =
-    `<p><strong>${esc(m.name)}</strong> — ${esc(m.email)}<br>Package: <strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo)${planOff ? ' — <span style="color:#b00;font-weight:700">Plan deactivated</span>' : ''}<br>`+
-    `Methods: ${(p.package.methods||[]).join(', ')}<br>`+
+    `<p><strong>${esc(m.name)}</strong> — ${esc(m.email)}<br>`+
+    (shownPkg
+      ? `Package: <strong>${esc(shownPkg.name)}</strong> (৳${esc(shownPkg.priceBDT)}/mo)${planOff ? ' — <span style="color:#b00;font-weight:700">Plan deactivated</span>' : ''}${waitingPkg ? ' — <span style="color:#8a6d00;font-weight:700">Waiting for approval</span>' : ''}<br>Methods: ${(shownPkg.methods||[]).join(', ')}<br>`
+      : `Package: <strong>No package yet</strong> — buy one from the <a href="/#pricing">pricing page</a><br>`) +
     `Verifications this month: ${p.usage.verificationsUsedThisMonth} / ${p.usage.verificationsLimit ?? 'unlimited'}</p>`;
   const expDate = p.packageExpiresAt ? new Date(p.packageExpiresAt).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : null;
-  document.getElementById('statPackage').textContent = p.package.name;
-  document.getElementById('statPackageSub').textContent = planOff ? 'Plan deactivated' : ('৳' + p.package.priceBDT + '/mo' + (p.expiryState === 'pending' ? ' · Waiting for approval' : ''));
+  document.getElementById('statPackage').textContent = shownPkg ? shownPkg.name : 'No package';
+  document.getElementById('statPackageSub').textContent = planOff ? 'Plan deactivated' : (shownPkg ? ('৳' + shownPkg.priceBDT + '/mo' + (waitingPkg ? ' · Waiting for approval' : '')) : 'No package yet');
   document.getElementById('statExpiry').textContent = planOff ? 'Deactivated' : (expDate || 'No expiry');
   document.getElementById('statExpirySub').textContent = planOff ? '' : (p.expiryState === 'expired' ? 'Expired — renew koro' : (p.daysLeft !== null && p.daysLeft !== undefined ? p.daysLeft + ' day(s) left' : (p.expiryState === 'grace' ? p.graceDaysLeft + ' grace day(s) left' : '')));
   document.getElementById('statVerif').textContent = p.usage.verificationsUsedThisMonth + ' / ' + (p.usage.verificationsLimit ?? '∞');

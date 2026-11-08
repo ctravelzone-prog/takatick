@@ -738,6 +738,12 @@ app.get('/api/me/profile', auth, (req, res) => {
     .get(merchant.id);
   const used = verificationsUsedThisMonth(merchant.id);
   const exp = expiryState(merchant);
+  // v2.6: what is "waiting" comes from the pending order, not from the
+  // signup-time default package (which is 'basic' even when the merchant
+  // bought nothing). Null when no order exists.
+  const pendingOrder = db.prepare(
+    "SELECT * FROM orders WHERE merchant_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1"
+  ).get(merchant.id);
   // v2.2.2: the webhook secret is generated at signup, but its masked form
   // must not leak to a blocked (pending/expired) merchant — same rule as
   // the other keys: nothing key-like before activation.
@@ -754,6 +760,7 @@ app.get('/api/me/profile', auth, (req, res) => {
     apiKeyMasked: maskKey(apiRow?.key),
     appKeyMasked: maskKey(appRow?.key),
     webhookSecretMasked: blocked ? null : maskKey(merchant.webhook_secret),
+    waitingPackage: pendingOrder ? getPackage(pendingOrder.package) : null,
     usage: {
       verificationsUsedThisMonth: used,
       verificationsLimit: pkg.verificationsPerMonth,

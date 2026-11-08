@@ -605,7 +605,10 @@ test('v1.8 optimistic profile chip: setProfileChip sets the chip from signup dat
   // The landing still shows the chip for logged-in merchants via updateNav.
   const home = await req('/');
   assert.match(home.text, /function setProfileChip/);
-  assert.match(home.text, /setProfileChip\(p\.merchant\.name, p\.package\.name, stateLabel\)/);
+  // v2.6: the chip uses the waiting package (or "No package") — not the
+  // signup-time default package.
+  assert.match(home.text, /setProfileChip\(p\.merchant\.name, chipPkg, stateLabel\)/);
+  assert.match(home.text, /No package yet/);
 });
 
 test('v1.8 master admin: extended stats (per-package, per-status, revenue, verifications)', async () => {
@@ -824,4 +827,13 @@ test('v2.5: dashboard warns 1 day before expiry + big expired box listing what s
   assert.match(d.text, /kichui kaj korbe na/);
   assert.match(d.text, /SMS asleo confirm hobe na/);
   assert.match(d.text, /const frozen = planOff/);
+});
+
+test('v2.6: dashboard shows "No package yet" until an order exists', async () => {
+  const d = await req('/dashboard.html');
+  assert.match(d.text, /No package yet/);
+  assert.match(d.text, /waitingPackage/);
+  const home = await req('/');
+  assert.match(home.text, /waitingPackage/);
+  assert.match(home.text, /No package yet/);
 });

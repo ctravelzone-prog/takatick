@@ -510,3 +510,42 @@ test('v2.4: phone required at signup, stored, visible to admin', async () => {
   const detail = await req(`/api/admin/merchants/${row.id}`, { token: tok });
   assert.equal(detail.json.merchant.phone, '01798765432');
 });
+
+test('v2.6: profile shows no package until an order exists; waiting package comes from the pending order', async () => {
+  // Fresh signup, no order: no waiting package.
+  const r = await req('/api/auth/signup', {
+    method: 'POST',
+    body: { name: 'No Order', email: 'noorder@takatick.test', phone: '01712345678', password: 'password123', package: 'basic' },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.json));
+  const login = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'noorder@takatick.test', password: 'password123' },
+  });
+  const token = login.json.token;
+  const prof = await req('/api/me/profile', { token });
+  assert.equal(prof.json.expiryState, 'pending');
+  assert.equal(prof.json.waitingPackage, null);
+  // Order a DIFFERENT package (standard): the waiting package is the
+  // order's package, not the signup-time default (basic).
+  const order = await req('/api/me/orders', {
+    method: 'POST', token,
+    body: { package: 'standard', trxid: 'WAITPKG001', sender: '01712345678', amount: 600 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  const prof2 = await req('/api/me/profile', { token });
+  assert.equal(prof2.json.waitingPackage.name, 'Standard');
+  assert.equal(prof2.json.waitingPackage.priceBDT, 600);
+  // The merchant's own package field still says basic until approval.
+  assert.equal(prof2.json.package.name, 'Basic');
+  // Approve: waiting package clears, real package becomes Standard.
+  const tok = await adminToken();
+  const approve = await req(`/api/admin/orders/${order.json.order.id}/approve`, {
+    method: 'POST', token: tok, body: {},
+  });
+  assert.equal(approve.status, 200, JSON.stringify(approve.json));
+  const prof3 = await req('/api/me/profile', { token });
+  assert.equal(prof3.json.expiryState, 'active');
+  assert.equal(prof3.json.waitingPackage, null);
+  assert.equal(prof3.json.package.name, 'Standard');
+});
