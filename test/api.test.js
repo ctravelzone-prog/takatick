@@ -423,6 +423,10 @@ test('v2.2: keys + downloads locked until activation, issued on approve', async 
   assert.ok(apiKey.json.apiKey.startsWith('sk_live_'));
   // Downloads now work.
   assert.equal((await req('/download/app.apk', { token })).status, 200);
+  // v2.7.1: the served APK is the release-signed v1.1 build.
+  const dl = await fetch(base + '/download/app.apk', { headers: { Authorization: 'Bearer ' + token } });
+  assert.equal(dl.status, 200);
+  assert.match(dl.headers.get('content-disposition') || '', /TakaTickSMS-v1\.1\.apk/);
   assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip', { token })).status, 200);
 });
 

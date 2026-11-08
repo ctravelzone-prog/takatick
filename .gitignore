@@ -5,3 +5,4 @@ android-app/build-manual/
 *.log
 .DS_Store
 *.keystore
+.release-keystore-pass
