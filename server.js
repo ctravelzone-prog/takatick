@@ -20,30 +20,60 @@ const jwt = require('jsonwebtoken');
 const { db, nowIso, currentMonthPrefix } = require('./src/db');
 const { parseSms } = require('./src/smsParser');
 const { fireWebhook } = require('./src/webhook');
-const { getConfig, getBrand, getPackage, verificationLimitReached, ALL_METHODS, methodAllowedForPackage } = require('./src/limits');
+const { getConfig, getBrand, getPackage, getGraceDays, verificationLimitReached, ALL_METHODS, methodAllowedForPackage } = require('./src/limits');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me';
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const config = getConfig();
+const DAY_MS = 24 * 3600 * 1000;
+const PACKAGE_DAYS = 30;
+
+// Seller payment number (public — shown on the enroll/pricing page).
+// Siam's bKash number; SELLER_BKASH_NUMBER env overrides, the fallback
+// below is the same number (it is meant to be shown publicly).
+const SELLER_BKASH_NUMBER = process.env.SELLER_BKASH_NUMBER || '01740707570';
+// Admin account: seeded from env on first boot (see ensureAdminSeeded).
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || null;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// Brand injection for static pages: login.html / dashboard.html carry the
-// {{BRAND}} placeholder (no hardcoded brand string in the pages). The brand
-// comes from the single config value — config/packages.json `brand`, or
-// BRAND_NAME env which overrides it (see getBrand() in src/limits.js).
+// Brand injection for static pages: login.html / dashboard.html / pricing.html /
+// admin.html carry the {{BRAND}} placeholder (no hardcoded brand string in the
+// pages). The brand comes from the single config value — config/packages.json
+// `brand`, or BRAND_NAME env which overrides it (see getBrand() in src/limits.js).
+// pricing.html also gets {{SELLER_BKASH}} (Siam's public bKash number).
 app.use((req, res, next) => {
-  if (req.path === '/login.html' || req.path === '/dashboard.html') {
+  if (req.path === '/login.html' || req.path === '/dashboard.html' || req.path === '/admin.html') {
     try {
       const html = fs.readFileSync(path.join(__dirname, 'public', req.path), 'utf8');
-      return res.type('html').send(html.split('{{BRAND}}').join(escapeHtml(getBrand())));
+      return res.type('html').send(html
+        .split('{{BRAND}}').join(escapeHtml(getBrand()))
+        .split('{{SELLER_BKASH}}').join(escapeHtml(SELLER_BKASH_NUMBER)));
     } catch (_e) {
       return next();
     }
   }
   return next();
 });
+// Landing page (v1.3): root / serves public/index.html — TakaTick's
+// website (hero, features, how-it-works, pricing, FAQ, enroll flow),
+// with brand + seller bKash number injected. These routes MUST be defined
+// BEFORE express.static, which would otherwise serve index.html raw.
+// /pricing.html redirects to the pricing section of the landing page.
+app.get('/', (_req, res) => {
+  try {
+    const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+    return res.type('html').send(html
+      .split('{{BRAND}}').join(escapeHtml(getBrand()))
+      .split('{{SELLER_BKASH}}').join(escapeHtml(SELLER_BKASH_NUMBER)));
+  } catch (_e) {
+    return res.redirect('/login.html');
+  }
+});
+app.get('/pricing.html', (_req, res) => res.redirect('/#pricing'));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------
@@ -97,12 +127,62 @@ function publicMerchant(m) {
     name: m.name,
     email: m.email,
     package: m.package,
+    package_expires_at: m.package_expires_at || null,
+    status: m.status || 'active',
     webhook_url: m.webhook_url || null,
     success_url: m.success_url || null,
     fail_url: m.fail_url || null,
     pay_key: m.pay_key,
     created_at: m.created_at,
   };
+}
+
+// ---------- admin seeding (v1.3) ----------
+// If ADMIN_EMAIL + ADMIN_PASSWORD are set, create that admin account on
+// first boot (bcrypt hash in DB). Never overwrites an existing admin.
+// If the env vars are unset, no admin exists and /api/admin/login
+// answers ADMIN_NOT_CONFIGURED.
+function ensureAdminSeeded() {
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) return;
+  try {
+    const existing = db.prepare('SELECT id FROM admins WHERE email = ?')
+      .get(ADMIN_EMAIL.toLowerCase());
+    if (existing) return;
+    db.prepare('INSERT INTO admins (email, password_hash, created_at) VALUES (?, ?, ?)')
+      .run(ADMIN_EMAIL.toLowerCase(), bcrypt.hashSync(ADMIN_PASSWORD, 10), nowIso());
+  } catch (_e) {
+    // Seeding must never break boot.
+  }
+}
+ensureAdminSeeded();
+
+// ---------- package expiry / grace (v1.3) ----------
+// package_expires_at NULL = no expiry (grandfathered accounts).
+// Otherwise: active until expires_at, then a grace period of
+// config graceDays during which everything still works, then expired.
+function expiryState(merchant) {
+  const exp = merchant.package_expires_at;
+  if (!exp) return { state: 'active', daysLeft: null, graceDaysLeft: null, expiresAt: null };
+  const expMs = new Date(exp).getTime();
+  const now = Date.now();
+  const graceMs = getGraceDays() * DAY_MS;
+  if (now < expMs) {
+    return { state: 'active', daysLeft: Math.ceil((expMs - now) / DAY_MS), graceDaysLeft: null, expiresAt: exp };
+  }
+  if (now < expMs + graceMs) {
+    return { state: 'grace', daysLeft: 0, graceDaysLeft: Math.ceil((expMs + graceMs - now) / DAY_MS), expiresAt: exp };
+  }
+  return { state: 'expired', daysLeft: 0, graceDaysLeft: 0, expiresAt: exp };
+}
+
+// Returns { error, status } when the merchant may not verify/confirm
+// (deactivated, or expired past the grace period), else null.
+// Grace-period merchants are NOT blocked.
+function merchantBlocked(merchant) {
+  if (!merchant) return { error: 'INVALID_API_KEY', status: 401 };
+  if (merchant.status === 'deactivated') return { error: 'ACCOUNT_DEACTIVATED', status: 403 };
+  if (expiryState(merchant).state === 'expired') return { error: 'PACKAGE_EXPIRED', status: 403 };
+  return null;
 }
 
 // JWT auth middleware: Authorization: Bearer <jwt> -> req.merchantId
@@ -129,6 +209,10 @@ function lookupAndCheck(apiKey, amountBdt, transactionId) {
   if (!keyRow) return { error: 'INVALID_API_KEY', status: 401 };
   const merchant = getMerchantById(keyRow.merchant_id);
   if (!merchant) return { error: 'INVALID_API_KEY', status: 401 };
+  // Deactivated merchants and merchants past their grace period cannot
+  // verify or confirm. Grace-period merchants still work normally.
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return { error: blocked.error, status: blocked.status };
   const amountPoisha = toPoisha(amountBdt);
   if (amountPoisha === null || amountPoisha <= 0) {
     return { error: 'INVALID_AMOUNT', status: 400 };
@@ -142,11 +226,210 @@ function lookupAndCheck(apiKey, amountBdt, transactionId) {
   return { merchant, sms, amountPoisha };
 }
 
+// ---------- public pricing (landing page data) ----------
+
+app.get('/api/public/pricing', (_req, res) => {
+  const packages = Object.entries(config.packages).map(([id, p]) => ({
+    id,
+    name: p.name,
+    priceBDT: p.priceBDT,
+    numbers: p.numbers,
+    websites: p.websites,
+    verificationsPerMonth: p.verificationsPerMonth,
+    webhook: !!p.webhook,
+    methods: p.methods,
+    woocommerce: !!p.woocommerce,
+    prioritySupport: !!p.prioritySupport,
+  }));
+  return res.json({
+    ok: true,
+    brand: getBrand(),
+    sellerBkash: SELLER_BKASH_NUMBER,
+    graceDays: getGraceDays(),
+    packages,
+  });
+});
+
+// ---------- package orders (v1.3) ----------
+
+app.get('/api/me/orders', auth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM orders WHERE merchant_id = ? ORDER BY id DESC LIMIT 50')
+    .all(req.merchantId);
+  return res.json({ ok: true, orders: rows });
+});
+
+app.post('/api/me/orders', auth, (req, res) => {
+  const { package: pkgId, trxid, sender, amount } = req.body || {};
+  const pkg = config.packages[pkgId];
+  if (!pkg) return res.status(400).json({ ok: false, error: 'INVALID_PACKAGE' });
+  const trx = String(trxid || '').trim();
+  if (!trx) return res.status(400).json({ ok: false, error: 'INVALID_TRXID' });
+  if (!sender || !/^01[3-9]\d{8}$/.test(String(sender).trim())) {
+    return res.status(400).json({ ok: false, error: 'INVALID_SENDER' });
+  }
+  const amountPoisha = toPoisha(amount);
+  if (amountPoisha === null || amountPoisha !== pkg.priceBDT * 100) {
+    return res.status(400).json({ ok: false, error: 'AMOUNT_MISMATCH', expectedBDT: pkg.priceBDT });
+  }
+  const dup = db.prepare('SELECT id FROM orders WHERE trxid = ?').get(trx);
+  if (dup) return res.status(409).json({ ok: false, error: 'DUPLICATE_TRXID' });
+  try {
+    const info = db.prepare(
+      `INSERT INTO orders (merchant_id, package, amount_poisha, trxid, sender, status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?)`
+    ).run(req.merchantId, pkgId, amountPoisha, trx, String(sender).trim(), nowIso());
+    const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(info.lastInsertRowid);
+    return res.status(201).json({ ok: true, order: row });
+  } catch (e) {
+    if (String(e.message || '').includes('UNIQUE')) {
+      return res.status(409).json({ ok: false, error: 'DUPLICATE_TRXID' });
+    }
+    return res.status(500).json({ ok: false, error: 'ORDER_FAILED' });
+  }
+});
+
+// ---------- admin (v1.3) ----------
+
+app.post('/api/admin/login', (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ ok: false, error: 'INVALID_REQUEST' });
+  const admin = db.prepare('SELECT * FROM admins WHERE email = ?').get(String(email).toLowerCase());
+  if (!admin) {
+    // No admin configured at all vs wrong credentials — different error.
+    const anyAdmin = db.prepare('SELECT id FROM admins LIMIT 1').get();
+    if (!anyAdmin) {
+      return res.status(503).json({
+        ok: false,
+        error: 'ADMIN_NOT_CONFIGURED',
+        message: 'Admin account is not set up yet. Set ADMIN_EMAIL and ADMIN_PASSWORD in the environment and restart the server.',
+      });
+    }
+    return res.status(401).json({ ok: false, error: 'INVALID_CREDENTIALS' });
+  }
+  if (!bcrypt.compareSync(String(password), admin.password_hash)) {
+    return res.status(401).json({ ok: false, error: 'INVALID_CREDENTIALS' });
+  }
+  const token = jwt.sign({ role: 'admin', adminId: admin.id }, JWT_SECRET, { expiresIn: '7d' });
+  return res.json({ ok: true, token });
+});
+
+function adminAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.role !== 'admin' || !payload.adminId) {
+      return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    }
+    req.adminId = payload.adminId;
+    return next();
+  } catch (_e) {
+    return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+  }
+}
+
+function adminMerchantRow(m) {
+  const exp = expiryState(m);
+  const used = verificationsUsedThisMonth(m.id);
+  const pkg = getPackage(m.package);
+  let state = exp.state;
+  if (state === 'active' && exp.daysLeft !== null && exp.daysLeft <= 3) state = 'expiring-soon';
+  if (!m.package_expires_at) state = 'no-expiry';
+  return {
+    id: m.id,
+    name: m.name,
+    email: m.email,
+    package: m.package,
+    status: m.status || 'active',
+    package_expires_at: m.package_expires_at || null,
+    expiry_state: state,
+    days_left: exp.daysLeft,
+    grace_days_left: exp.graceDaysLeft,
+    verifications_used_this_month: used,
+    verifications_limit: pkg.verificationsPerMonth,
+    created_at: m.created_at,
+  };
+}
+
+app.get('/api/admin/stats', adminAuth, (_req, res) => {
+  const merchants = db.prepare('SELECT COUNT(*) AS c FROM merchants').get().c;
+  const pending = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE status = 'pending'").get().c;
+  return res.json({ ok: true, stats: { merchants, pendingOrders: pending, graceDays: getGraceDays() } });
+});
+
+app.get('/api/admin/merchants', adminAuth, (_req, res) => {
+  const rows = db.prepare('SELECT * FROM merchants ORDER BY id DESC').all();
+  return res.json({ ok: true, merchants: rows.map(adminMerchantRow) });
+});
+
+app.get('/api/admin/orders', adminAuth, (_req, res) => {
+  const rows = db.prepare(
+    `SELECT o.*, m.name AS merchant_name, m.email AS merchant_email
+     FROM orders o JOIN merchants m ON m.id = o.merchant_id
+     ORDER BY CASE WHEN o.status = 'pending' THEN 0 ELSE 1 END, o.created_at DESC, o.id DESC`
+  ).all();
+  return res.json({ ok: true, orders: rows });
+});
+
+app.post('/api/admin/orders/:id/approve', adminAuth, (req, res) => {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (order.status !== 'pending') return res.status(409).json({ ok: false, error: 'ORDER_ALREADY_DECIDED' });
+  const merchant = getMerchantById(order.merchant_id);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  // Fresh 30 days from approval — never stacked on the old expiry.
+  // Same for new buys, renewals and upgrades (incl. renewal during grace).
+  const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
+  const decidedAt = nowIso();
+  db.prepare("UPDATE orders SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?")
+    .run(decidedAt, String(req.adminId), order.id);
+  db.prepare('UPDATE merchants SET package = ?, package_expires_at = ? WHERE id = ?')
+    .run(order.package, expiresAt, merchant.id);
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  return res.json({ ok: true, order: updated, merchant: publicMerchant(getMerchantById(merchant.id)) });
+});
+
+app.post('/api/admin/orders/:id/reject', adminAuth, (req, res) => {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (order.status !== 'pending') return res.status(409).json({ ok: false, error: 'ORDER_ALREADY_DECIDED' });
+  db.prepare("UPDATE orders SET status = 'rejected', decided_at = ?, decided_by = ? WHERE id = ?")
+    .run(nowIso(), String(req.adminId), order.id);
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  return res.json({ ok: true, order: updated });
+});
+
+app.post('/api/admin/merchants/:id/package', adminAuth, (req, res) => {
+  const pkgId = req.body?.package;
+  if (!config.packages[pkgId]) return res.status(400).json({ ok: false, error: 'INVALID_PACKAGE' });
+  const merchant = getMerchantById(req.params.id);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  db.prepare('UPDATE merchants SET package = ? WHERE id = ?').run(pkgId, merchant.id);
+  return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
+});
+
+app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
+  const status = req.body?.status;
+  if (status !== 'active' && status !== 'deactivated') {
+    return res.status(400).json({ ok: false, error: 'INVALID_STATUS' });
+  }
+  const merchant = getMerchantById(req.params.id);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  db.prepare('UPDATE merchants SET status = ? WHERE id = ?').run(status, merchant.id);
+  return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
+});
+
+// APK download (single source: android-app/TakaTickSMS-v1.0.apk).
+app.get('/download/app.apk', (_req, res) => {
+  const apkPath = path.join(__dirname, 'android-app', 'TakaTickSMS-v1.0.apk');
+  if (!fs.existsSync(apkPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.download(apkPath, 'TakaTickSMS-v1.0.apk');
+});
+
 // ---------- public routes ----------
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
-
-app.get('/', (_req, res) => res.redirect('/login.html'));
 
 app.post('/api/auth/signup', (req, res) => {
   const { name, email, password } = req.body || {};
@@ -172,11 +455,16 @@ app.post('/api/auth/signup', (req, res) => {
   const apiKey = 'sk_live_' + crypto.randomBytes(24).toString('hex');
   const appKey = 'app_' + crypto.randomBytes(24).toString('hex');
   const createdAt = nowIso();
+  // New accounts start a 30-day window at signup (a trial). The first
+  // approved order resets the clock to approval + 30 days (fresh, never
+  // stacked). Accounts created before v1.3 have NULL expiry and are
+  // grandfathered — this only applies to new signups.
+  const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
   try {
     const info = db.prepare(
-      `INSERT INTO merchants (name, email, password_hash, package, webhook_secret, pay_key, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(name.trim(), String(email).toLowerCase(), passwordHash, pkg, webhookSecret, payKey, createdAt);
+      `INSERT INTO merchants (name, email, password_hash, package, package_expires_at, webhook_secret, pay_key, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(name.trim(), String(email).toLowerCase(), passwordHash, pkg, expiresAt, webhookSecret, payKey, createdAt);
     const merchantId = info.lastInsertRowid;
     db.prepare('INSERT INTO api_keys (merchant_id, key, label, created_at) VALUES (?, ?, ?, ?)')
       .run(merchantId, apiKey, 'default', createdAt);
@@ -220,10 +508,16 @@ app.get('/api/me/profile', auth, (req, res) => {
   const appRow = db.prepare('SELECT key FROM app_keys WHERE merchant_id = ? ORDER BY id DESC LIMIT 1')
     .get(merchant.id);
   const used = verificationsUsedThisMonth(merchant.id);
+  const exp = expiryState(merchant);
   return res.json({
     ok: true,
     merchant: publicMerchant(merchant),
     package: pkg,
+    packageExpiresAt: merchant.package_expires_at || null,
+    expiryState: exp.state,
+    daysLeft: exp.daysLeft,
+    graceDaysLeft: exp.graceDaysLeft,
+    graceDays: getGraceDays(),
     apiKeyMasked: maskKey(apiRow?.key),
     appKeyMasked: maskKey(appRow?.key),
     usage: {
@@ -482,7 +776,7 @@ app.post('/api/v1/confirm', (req, res) => {
 
 // ---------- Hosted pay page ----------
 
-function payPageHtml(brand, merchant, numbers, amount, orderId) {
+function payPageHtml(brand, merchant, numbers, amount, orderId, notice) {
   const amountText = amount ? `৳${escapeHtml(amount)}` : '';
   // Group the merchant's numbers by method (only registered numbers shown).
   const methodLabels = { bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', upay: 'Upay' };
@@ -504,8 +798,9 @@ function payPageHtml(brand, merchant, numbers, amount, orderId) {
 .num{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #eee}
 .label{color:#666;font-size:13px}button{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#111;color:#fff;cursor:pointer}
 input,select{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
-h1{font-size:22px}.muted{color:#666;font-size:14px}</style></head><body>
+h1{font-size:22px}.muted{color:#666;font-size:14px}.notice{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px}</style></head><body>
 <div class="card"><h1>Pay ${escapeHtml(brand)}</h1>
+${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
 <p class="muted">Pay to ${escapeHtml(merchant.name)} using bKash, Nagad, Rocket or Upay, then enter your TrxID below.</p>
 ${amountText ? `<p><strong>Amount:</strong> ${amountText}</p>` : ''}
 ${orderId ? `<p><strong>Order:</strong> ${escapeHtml(orderId)}</p>` : ''}
@@ -534,14 +829,37 @@ ${linkUrl ? `<p><a href="${escapeHtml(linkUrl)}">${escapeHtml(linkText || 'Conti
 app.get('/pay/:payKey', (req, res) => {
   const merchant = db.prepare('SELECT * FROM merchants WHERE pay_key = ?').get(req.params.payKey);
   if (!merchant) return res.status(404).send(resultPageHtml(getBrand(), 'Not found', 'This payment link is invalid.', null, null));
+  const blocked = merchantBlocked(merchant);
+  if (blocked) {
+    const expired = blocked.error === 'PACKAGE_EXPIRED';
+    return res.status(403).send(resultPageHtml(getBrand(),
+      expired ? 'Payment link expired' : 'Payment link disabled',
+      expired
+        ? 'This seller’s package has expired. Please contact the seller to renew.'
+        : 'This payment link is currently disabled. Please contact the seller.',
+      null, null));
+  }
   const numbers = db.prepare('SELECT * FROM numbers WHERE merchant_id = ? ORDER BY id').all(merchant.id);
-  return res.send(payPageHtml(getBrand(), merchant, numbers, req.query.amount, req.query.order_id));
+  const exp = expiryState(merchant);
+  const notice = exp.state === 'grace'
+    ? `Note: this seller’s package is in its ${getGraceDays()}-day grace period (renewal pending) — payments still work normally.`
+    : null;
+  return res.send(payPageHtml(getBrand(), merchant, numbers, req.query.amount, req.query.order_id, notice));
 });
 
 app.post('/pay/:payKey/claim', (req, res) => {
   const merchant = db.prepare('SELECT * FROM merchants WHERE pay_key = ?').get(req.params.payKey);
   const brand = getBrand();
   if (!merchant) return res.status(404).send(resultPageHtml(brand, 'Not found', 'This payment link is invalid.', null, null));
+  const blocked = merchantBlocked(merchant);
+  if (blocked) {
+    return res.status(403).send(resultPageHtml(brand,
+      blocked.error === 'PACKAGE_EXPIRED' ? 'Payment expired' : 'Payment disabled',
+      blocked.error === 'PACKAGE_EXPIRED'
+        ? 'This seller’s package has expired. Please contact the seller to renew.'
+        : 'This payment link is currently disabled. Please contact the seller.',
+      merchant.fail_url, 'Return to store'));
+  }
   const method = req.body?.method;
   const amount = req.body?.amount;
   const orderId = req.body?.order_id || req.body?.orderId || null;

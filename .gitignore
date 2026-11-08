@@ -4,3 +4,4 @@ data/
 android-app/build-manual/
 *.log
 .DS_Store
+*.keystore

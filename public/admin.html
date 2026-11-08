@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — {{BRAND}}</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:1000px;margin:0 auto;padding:20px;background:#f7f7f7;color:#222}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px}
+input,select{padding:9px;margin:4px;border:1px solid #ccc;border-radius:8px}
+button{padding:9px 14px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
+button.danger{background:#b00}
+button.ok{background:#0a7d2e}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{border-bottom:1px solid #eee;padding:6px;text-align:left;overflow-wrap:anywhere}
+code{background:#eee;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
+#msg{color:#b00}
+.pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;background:#eee}
+.pill.pending{background:#ffe9a8}.pill.approved{background:#c9ecd4}.pill.rejected{background:#f6c9c9}
+.pill.expired{background:#f6c9c9}.pill.grace{background:#ffe9a8}.pill.expiring-soon{background:#ffe9a8}
+.pill.active{background:#c9ecd4}.pill.deactivated{background:#f6c9c9}.pill.no-expiry{background:#e2e2e2}
+</style>
+</head>
+<body>
+<h1>{{BRAND}} — Admin panel</h1>
+<p><a href="/">← Back to website</a></p>
+<div id="msg"></div>
+
+<div class="card" id="loginCard">
+  <h2>Admin log in</h2>
+  <form id="loginForm">
+    <label>Email</label><input name="email" type="email" required style="width:100%">
+    <label>Password</label><input name="password" type="password" required style="width:100%">
+    <button type="submit">Log in</button>
+  </form>
+  <p style="color:#666;font-size:14px">Admin account is set from the server environment (ADMIN_EMAIL / ADMIN_PASSWORD). If it is not set up yet, login shows ADMIN_NOT_CONFIGURED.</p>
+</div>
+
+<div id="panel" style="display:none">
+  <p><button onclick="logout()">Log out</button></p>
+  <div class="card"><h2>Overview</h2><div id="stats">Loading…</div></div>
+  <div class="card"><h2>Orders (pending first)</h2><div id="orders">Loading…</div></div>
+  <div class="card"><h2>Merchants</h2><div id="merchants">Loading…</div></div>
+</div>
+
+<script>
+const token = () => localStorage.getItem('adminToken');
+const msg = document.getElementById('msg');
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function api(path, opts={}){
+  const r = await fetch(path, {...opts, headers:{'Content-Type':'application/json', Authorization:'Bearer '+token(), ...(opts.headers||{})}});
+  return r.json();
+}
+function logout(){ localStorage.removeItem('adminToken'); location.reload(); }
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ' ' +
+    d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+}
+async function load(){
+  const s = await api('/api/admin/stats');
+  if(!s.ok){ msg.textContent = s.error || 'Session expired'; if(s.error==='UNAUTHORIZED') logout(); return; }
+  document.getElementById('stats').innerHTML =
+    `<p>Merchants: <strong>${s.stats.merchants}</strong> &nbsp; Pending orders: <strong>${s.stats.pendingOrders}</strong> &nbsp; Grace period: <strong>${s.stats.graceDays} days</strong></p>`;
+  const o = await api('/api/admin/orders');
+  document.getElementById('orders').innerHTML = '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Amount</th><th>TrxID</th><th>Sender</th><th>Status</th><th>Created</th><th>Action</th></tr>' +
+    (o.orders||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.merchant_name)}<br><small>${esc(x.merchant_email)}</small></td><td>${esc(x.package)}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td><code>${esc(x.trxid)}</code></td><td>${esc(x.sender||'')}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.created_at)}</td><td>${x.status==='pending' ? `<button class="ok" onclick="decide(${x.id},'approve')">Approve</button> <button class="danger" onclick="decide(${x.id},'reject')">Reject</button>` : esc(x.decided_at||'')}</td></tr>`).join('') + '</table>';
+  const m = await api('/api/admin/merchants');
+  document.getElementById('merchants').innerHTML = '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Status</th><th>Expires</th><th>State</th><th>Usage/mo</th><th>Joined</th><th>Action</th></tr>' +
+    (m.merchants||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.name)}<br><small>${esc(x.email)}</small></td><td>${esc(x.package)}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.package_expires_at)}${x.days_left!==null && x.expiry_state!=='no-expiry' ? `<br><small>${x.expiry_state==='grace' ? x.grace_days_left+' grace day(s) left' : x.days_left+' day(s) left'}</small>` : ''}</td><td><span class="pill ${esc(x.expiry_state)}">${esc(x.expiry_state)}</span></td><td>${x.verifications_used_this_month} / ${x.verifications_limit ?? '∞'}</td><td>${fmtDate(x.created_at)}</td><td><select onchange="setPackage(${x.id}, this.value)"><option value="">Change package…</option><option value="basic">Basic</option><option value="standard">Standard</option><option value="premium">Premium</option></select><br><button class="${x.status==='active'?'danger':''}" onclick="setStatus(${x.id}, '${x.status==='active'?'deactivated':'active'}')">${x.status==='active'?'Deactivate':'Activate'}</button></td></tr>`).join('') + '</table>';
+}
+async function decide(id, action){
+  const o = await api(`/api/admin/orders/${id}/${action}`, {method:'POST', body:'{}'});
+  if(!o.ok) alert(o.error||'Failed'); load();
+}
+async function setPackage(id, pkg){
+  if(!pkg) return;
+  const o = await api(`/api/admin/merchants/${id}/package`, {method:'POST', body: JSON.stringify({package: pkg})});
+  if(!o.ok) alert(o.error||'Failed'); load();
+}
+async function setStatus(id, status){
+  const o = await api(`/api/admin/merchants/${id}/status`, {method:'POST', body: JSON.stringify({status})});
+  if(!o.ok) alert(o.error||'Failed'); load();
+}
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const r = await fetch('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email: f.get('email'), password: f.get('password')})});
+  const o = await r.json();
+  if(o.ok){ localStorage.setItem('adminToken', o.token); showPanel(); }
+  else msg.textContent = o.error + (o.message ? ' — ' + o.message : '');
+});
+function showPanel(){
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('panel').style.display = 'block';
+  load();
+}
+if(token()) showPanel();
+</script>
+</body>
+</html>

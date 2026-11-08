@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{BRAND}} — bKash / Nagad / Rocket / Upay payment verification</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;margin:0;background:#f7f7f7;color:#222}
+a{color:#0b5fff}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;z-index:10}
+.nav{display:flex;align-items:center;gap:18px;max-width:960px;margin:0 auto;padding:14px 20px}
+.nav .logo{font-weight:800;font-size:20px;color:#111;text-decoration:none;margin-right:auto}
+.nav a.link{color:#444;text-decoration:none;font-size:15px}
+.btn{display:inline-block;padding:11px 20px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer;font-size:15px;text-decoration:none}
+.btn.outline{background:#fff;color:#111;border:1px solid #ccc}
+.btn.big{padding:14px 28px;font-size:17px}
+.hero{background:#111;color:#fff;padding:64px 0 56px;text-align:center}
+.hero h1{font-size:36px;line-height:1.2;margin:0 0 14px}
+.hero p{font-size:18px;color:#ccc;max-width:640px;margin:0 auto 24px}
+.hero .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.hero .btn{background:#fff;color:#111}
+.hero .btn.ghost{background:transparent;color:#fff;border:1px solid #666}
+section{padding:48px 0}
+section h2{font-size:26px;margin:0 0 8px;text-align:center}
+section .sub{color:#666;text-align:center;max-width:640px;margin:0 auto 28px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.card h3{margin:0 0 8px;font-size:18px}
+.card p{color:#555;font-size:15px;line-height:1.5;margin:0}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;counter-reset:step}
+.step{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.step .n{font-size:28px;font-weight:800;color:#0b5fff}
+.price-card{text-align:center}
+.price-card .price{font-size:34px;font-weight:800;margin:8px 0}
+.price-card ul{text-align:left;list-style:none;padding:0;margin:16px 0}
+.price-card li{padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:15px}
+.price-card li:last-child{border-bottom:0}
+.price-card.popular{border:2px solid #111}
+.badge{display:inline-block;background:#111;color:#fff;font-size:12px;border-radius:20px;padding:3px 10px}
+.faq{max-width:680px;margin:0 auto}
+.faq details{background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.faq summary{font-weight:700;cursor:pointer}
+.faq p{color:#555;line-height:1.6}
+.enroll-box{max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+input,select{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px}
+label{font-size:14px;font-weight:600}
+#enrollMsg{color:#b00;min-height:1.2em}
+.paynum{font-size:22px;font-weight:800;letter-spacing:1px}
+.notice{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:12px;font-size:15px}
+.okbox{background:#e9f7ee;border:1px solid #7cc79a;border-radius:8px;padding:12px;font-size:15px}
+footer{background:#111;color:#999;padding:32px 0;font-size:14px}
+footer a{color:#ccc}
+footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
+@media (max-width:640px){.hero h1{font-size:28px}.nav a.link{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <nav class="nav">
+    <a class="logo" href="/">{{BRAND}}</a>
+    <a class="link" href="#features">Features</a>
+    <a class="link" href="#how">How it works</a>
+    <a class="link" href="#pricing">Pricing</a>
+    <a class="link" href="#faq">FAQ</a>
+    <a class="link" href="/login.html">Log in</a>
+    <a class="btn" href="#enroll">Sign up</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>bKash, Nagad, Rocket &amp; Upay payments — verified automatically.</h1>
+    <p>{{BRAND}} checks every payment your customers send to your own personal number — TrxID + exact amount, no manual checking, no holding your money.</p>
+    <div class="cta">
+      <a class="btn big" href="#enroll">Sign up — start verifying</a>
+      <a class="btn big ghost" href="#pricing">See pricing</a>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything you need to accept MFS payments</h2>
+    <p class="sub">Built for small and medium Bangladeshi websites that take bKash, Nagad, Rocket or Upay — without checking every TrxID by hand.</p>
+    <div class="cards">
+      <div class="card"><h3>📱 All 4 MFS via SMS app</h3><p>Install the {{BRAND}} SMS app on the phone that receives payment SMS. bKash, Nagad, Rocket and Upay SMS are forwarded to the server automatically — nothing else is read or sent.</p></div>
+      <div class="card"><h3>✅ Verify + Confirm API</h3><p>Two-step API: <code>verify</code> checks TrxID + exact amount, <code>confirm</code> marks it used forever. One TrxID can never pay twice.</p></div>
+      <div class="card"><h3>🔗 Hosted pay page</h3><p>No code needed — share your pay link. Customers see your numbers with copy buttons, pay from their MFS app, and submit the TrxID.</p></div>
+      <div class="card"><h3>🔔 HMAC-signed webhook</h3><p>On every confirmed payment your site gets a signed <code>payment.confirmed</code> event — verify the signature and mark the order paid.</p></div>
+      <div class="card"><h3>🛒 WooCommerce plugin</h3><p>Premium includes a ready WooCommerce gateway: checkout shows bKash / Nagad / Rocket / Upay and orders complete automatically on webhook.</p></div>
+      <div class="card"><h3>🔑 Your own API keys</h3><p>Every merchant gets separate API, app and pay keys. Regenerate anytime from the dashboard — a leaked key stops working the moment you rotate it.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how" style="background:#fff">
+  <div class="wrap">
+    <h2>How it works — 3 steps</h2>
+    <p class="sub">From sign-up to your first auto-verified payment in minutes.</p>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Sign up &amp; pick a package</h3><p>Create your account below, choose Basic, Standard or Premium, and pay the monthly fee by bKash Send Money. Admin approves — your package activates for 30 days.</p></div>
+      <div class="step"><div class="n">2</div><h3>Add your number + install the app</h3><p>Add your bKash / Nagad / Rocket / Upay number in the dashboard and install the {{BRAND}} SMS app on the phone that receives payment SMS. Download it from your dashboard.</p></div>
+      <div class="step"><div class="n">3</div><h3>Payments verify themselves</h3><p>Customers pay to your number and submit the TrxID. {{BRAND}} matches it against the forwarded SMS — amount, method, one-time use — and confirms the order.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <h2>Pricing — monthly, no per-transaction fee</h2>
+    <p class="sub">Pay once a month by bKash. No percentage cut on your sales — the money always goes straight to your own number.</p>
+    <div class="cards" id="priceCards"><p style="text-align:center">Loading packages…</p></div>
+  </div>
+</section>
+
+<section id="enroll" style="background:#fff">
+  <div class="wrap">
+    <h2>Sign up &amp; buy a package</h2>
+    <p class="sub">Create your account, pay by bKash Send Money, submit the TrxID — admin approves and your package activates for 30 days.</p>
+    <div class="enroll-box">
+      <div id="enrollMsg"></div>
+      <div id="signupStep">
+        <form id="signupForm">
+          <label>Name</label><input name="name" required>
+          <label>Email</label><input name="email" type="email" required>
+          <label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
+          <label>Package</label>
+          <select name="package" id="pkgSelect"></select>
+          <button class="btn" type="submit" style="width:100%">Create account</button>
+        </form>
+        <p style="color:#666;font-size:14px">Already have an account? <a href="/login.html">Log in</a> — then buy or renew from your dashboard.</p>
+      </div>
+      <div id="payStep" style="display:none">
+        <h3 style="margin-top:0">Pay by bKash Send Money</h3>
+        <p>Send exactly <strong id="payAmount"></strong> to this bKash number (Send Money):</p>
+        <p><span class="paynum">{{SELLER_BKASH}}</span>
+        <button type="button" class="btn outline" onclick="navigator.clipboard.writeText('{{SELLER_BKASH}}');this.textContent='Copied!';">Copy number</button></p>
+        <form id="orderForm">
+          <label>Package</label><input id="orderPackage" readonly>
+          <label>Amount (৳, exact)</label><input id="orderAmount" readonly>
+          <label>TrxID (from your bKash payment)</label><input name="trxid" required placeholder="e.g. 9AB12CD34E">
+          <label>Your bKash number (the number you paid from)</label><input name="sender" required placeholder="01XXXXXXXXX">
+          <button class="btn" type="submit" style="width:100%">Submit TrxID</button>
+        </form>
+      </div>
+      <div id="pendingStep" style="display:none">
+        <div class="okbox"><strong>Order submitted!</strong><br><span id="pendingText"></span></div>
+        <p style="margin-top:12px"><a class="btn" href="/dashboard.html">Go to dashboard</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      <details><summary>Where does the customer's money go?</summary><p>Straight to <strong>your own</strong> bKash / Nagad / Rocket / Upay personal number. {{BRAND}} never holds, touches or routes your money — it only reads the payment SMS and verifies TrxID + amount.</p></details>
+      <details><summary>Can one TrxID pay twice?</summary><p>No. One TrxID can be confirmed exactly once. A second attempt with the same TrxID is rejected (<code>ALREADY_USED</code>).</p></details>
+      <details><summary>Who approves my package, and how long does it take?</summary><p>Approval is <strong>manual</strong> — the admin checks your bKash payment (TrxID + amount) and approves the order. Once approved, your package is active for 30 days and you can see it in your dashboard.</p></details>
+      <details><summary>What happens when my package expires?</summary><p>Your package runs for 30 days from approval. After expiry you get a <strong>3-day grace period</strong> — verification keeps working while you renew. After the grace period ends, verification stops until you renew. Your API keys and data are never deleted — renewal reuses the same keys.</p></details>
+      <details><summary>Can I get a refund?</summary><p>Before approval, ask the admin to cancel your pending order. Once approved and the package is active, the monthly fee is not refundable — please check the package facilities before paying.</p></details>
+      <details><summary>Does it work without the SMS app?</summary><p>No. The SMS app is what brings the payment SMS to the server. Without it, there is nothing to verify against. Download it from your dashboard after signing up.</p></details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap cols">
+    <div><strong style="color:#fff">{{BRAND}}</strong><br>bKash / Nagad / Rocket / Upay payment verification for Bangladeshi websites.</div>
+    <div><a href="#features">Features</a><br><a href="#pricing">Pricing</a><br><a href="#faq">FAQ</a></div>
+    <div><a href="/login.html">Merchant log in</a><br><a href="/dashboard.html">Merchant dashboard</a><br><a href="/admin.html">Admin</a></div>
+  </div>
+</footer>
+
+<script>
+let pricingData = null;
+let selectedPackage = (new URLSearchParams(location.search)).get('package') || 'basic';
+const msg = document.getElementById('enrollMsg');
+function showErr(o){ msg.textContent = o.ok ? '' : (o.error || 'Failed'); }
+function fmt(n){ return n === null || n === undefined ? 'Unlimited' : n; }
+
+async function loadPricing(){
+  const r = await fetch('/api/public/pricing');
+  pricingData = await r.json();
+  const pkgs = pricingData.packages || [];
+  if(!pkgs.some(p => p.id === selectedPackage)) selectedPackage = pkgs[0]?.id || 'basic';
+  document.getElementById('priceCards').innerHTML = pkgs.map(p => `
+    <div class="card price-card ${p.id==='premium'?'popular':''}">
+      ${p.id==='premium'?'<span class="badge">Most popular</span>':''}
+      <h3>${p.name}</h3><div class="price">৳${p.priceBDT}<span style="font-size:16px;color:#666">/mo</span></div>
+      <ul>
+        <li>MFS numbers: ${fmt(p.numbers)}</li>
+        <li>Websites: ${fmt(p.websites)}</li>
+        <li>Verifications/month: ${fmt(p.verificationsPerMonth)}</li>
+        <li>Methods: ${p.methods.join(', ')}</li>
+        <li>Webhook: ${p.webhook ? 'Yes' : 'No'}</li>
+        <li>WooCommerce plugin: ${p.woocommerce ? 'Yes' : 'No'}</li>
+        <li>Priority support: ${p.prioritySupport ? 'Yes' : 'No'}</li>
+      </ul>
+      <button class="btn" style="width:100%" onclick="choosePackage('${p.id}')">Choose ${p.name}</button>
+    </div>`).join('');
+  document.getElementById('pkgSelect').innerHTML = pkgs.map(p =>
+    `<option value="${p.id}" ${p.id===selectedPackage?'selected':''}>${p.name} — ৳${p.priceBDT}/mo</option>`).join('');
+  updatePayStep();
+}
+function choosePackage(id){
+  selectedPackage = id;
+  document.getElementById('pkgSelect').value = id;
+  updatePayStep();
+  document.getElementById('enroll').scrollIntoView({behavior:'smooth'});
+}
+function pkgById(id){ return (pricingData?.packages || []).find(p => p.id === id); }
+function updatePayStep(){
+  const p = pkgById(selectedPackage);
+  if(!p) return;
+  document.getElementById('payAmount').textContent = '৳' + p.priceBDT;
+  document.getElementById('orderPackage').value = p.name + ' — ৳' + p.priceBDT + '/mo';
+  document.getElementById('orderAmount').value = p.priceBDT;
+}
+async function post(url, body, token){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', ...(token?{Authorization:'Bearer '+token}:{})}, body: JSON.stringify(body)});
+  return r.json();
+}
+document.getElementById('pkgSelect').addEventListener('change', e => { selectedPackage = e.target.value; updatePayStep(); });
+document.getElementById('signupForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: f.get('package')});
+  if(!o.ok){ showErr(o); return; }
+  const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
+  if(!login.ok){ msg.textContent = 'Account created. Please log in.'; return; }
+  localStorage.setItem('token', login.token);
+  document.getElementById('signupStep').style.display = 'none';
+  document.getElementById('payStep').style.display = 'block';
+  msg.textContent = '';
+});
+document.getElementById('orderForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const token = localStorage.getItem('token');
+  const f = new FormData(e.target);
+  const p = pkgById(selectedPackage);
+  const o = await post('/api/me/orders', {package: selectedPackage, trxid: f.get('trxid'), sender: f.get('sender'), amount: p.priceBDT}, token);
+  if(!o.ok){ showErr(o); return; }
+  document.getElementById('payStep').style.display = 'none';
+  document.getElementById('pendingStep').style.display = 'block';
+  document.getElementById('pendingText').textContent =
+    `Order #${o.order.id} (${p.name}, ৳${p.priceBDT}) is pending. Admin approve korle package active hobe (30 din) — dashboard-e check korun.`;
+});
+// Logged-in merchant: skip signup, show the pay form directly.
+if(localStorage.getItem('token')){
+  document.getElementById('signupStep').style.display = 'none';
+  document.getElementById('payStep').style.display = 'block';
+}
+loadPricing();
+</script>
+</body>
+</html>

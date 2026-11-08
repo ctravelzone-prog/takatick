@@ -15,34 +15,52 @@ Bangladesh-er choto/majhari website owner, jara bKash, Nagad, Rocket ba Upay-te 
 
 Puro integration guide: **[INTEGRATION.md](./INTEGRATION.md)** — website owner-ra oitai porbe.
 
+## Website (landing page) + selling
+
+The root `/` is the TakaTick website: hero, features, how-it-works, pricing, FAQ and the enroll flow. A buyer picks a package, signs up, pays the monthly fee by bKash **Send Money to 01740707570** (SELLER_BKASH_NUMBER env, same number as the fallback default), submits the TrxID + sender number, and the order sits pending until the admin approves it. On approval the package activates for **30 days** (fresh from approval, never stacked).
+
+**Renewal + grace:** after the 30 days, the package gets a **3-day grace period** (`graceDays` in `config/packages.json`, changeable) — verify/confirm and the hosted pay page keep working, the dashboard shows a "Grace period — X din baki, renew koro" banner. After grace ends, verify/confirm return `403 PACKAGE_EXPIRED` and the pay page shows an expired notice. Renewal (new order → approve) sets a fresh 30 days from approval and reuses the same API keys — nothing is deleted on expiry. The dashboard shows the package, expiry date and grace/renew state prominently, with a Renew button.
+
+**Admin panel:** `/admin.html` + `/api/admin/*`. Admin account is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env on first boot; if unset, admin login answers `ADMIN_NOT_CONFIGURED`. The panel lists merchants (package, status, expiry date, expiry state: active / expiring-soon / grace / expired / no-expiry, usage) and orders (pending first) with approve/reject; it can also change a merchant's package manually and deactivate/activate a merchant (deactivated → verify/confirm `403 ACCOUNT_DEACTIVATED`).
+
+**Downloads (dashboard):** TakaTick SMS app APK (`/download/app.apk`, v1.0) and the WooCommerce plugin zip (`/downloads/takatick-woocommerce-plugin.zip`).
+
 ## Project tree
 
 ```
 payment-method-mvp/
 ├── README.md            # ei file — owner-er jonno overview
 ├── INTEGRATION.md       # website owner-der integration guide
-├── TEST_REPORT.md       # test result (22/22 pass)
+├── TEST_REPORT.md       # test result (36/36 pass)
+├── CHANGES-v1.3.md      # v1.3 changelog (storefront + admin + landing)
 ├── .env.example         # env variable-er sample (BRAND_NAME=TakaTick)
 ├── package.json         # Node.js project, dependencies
-├── server.js            # Express app entry — auth, me, sms, verify, pay
+├── server.js            # Express app entry — auth, me, sms, verify, pay, orders, admin
 ├── config/
-│   └── packages.json    # brand + tier limits (Basic/Standard/Premium)
+│   └── packages.json    # brand + tier limits (Basic/Standard/Premium) + graceDays
 ├── src/
-│   ├── db.js            # SQLite setup
+│   ├── db.js            # SQLite setup + orders/admins tables
 │   ├── smsParser.js     # bKash/Nagad/Rocket/Upay SMS parser
 │   ├── webhook.js       # HMAC-signed webhook sender
-│   └── limits.js        # tier limit checks
+│   └── limits.js        # tier limit checks + grace days
 ├── public/
+│   ├── index.html       # landing page (website: hero, features, pricing, FAQ, enroll)
 │   ├── login.html       # login page (brand config theke ase)
-│   └── dashboard.html   # merchant dashboard
+│   ├── dashboard.html   # merchant dashboard (package banner, downloads, orders)
+│   ├── admin.html       # admin panel (merchants, orders, approve/reject)
+│   └── downloads/
+│       └── takatick-woocommerce-plugin.zip  # WooCommerce plugin, ready to upload
+├── android-app/         # SMS forward kora Android app (Java, APK v1.0 built)
+│   ├── TakaTickSMS-v1.0.apk
+│   └── build-apk.sh     # manual APK build (aapt2 + d8, no Gradle download)
+├── woocommerce-plugin/  # WooCommerce gateway source (2 PHP file)
 └── test/
     ├── parser.test.js   # SMS parser unit tests
     ├── api.test.js      # end-to-end API tests (live server + webhook catcher)
+    ├── storefront.test.js # landing, orders, admin, expiry + grace tests
     └── fixtures/
         └── sms-samples.json  # 10 ta sample SMS
 ```
-
-> ⚠️ `android-app/` (SMS forward kora Android app) ei project-e **nei** — app ta banano hoyni. Backend + docs complete; Android app chara SMS server-e pathanor upay ekhon curl / test chara nei.
 
 ## Local-e run kora
 
@@ -62,6 +80,9 @@ Tarpor browser-e dashboard khulun (default `http://localhost:3000` — `PORT` en
 | `JWT_SECRET` | Login JWT sign korar secret — strong random value dite hobe |
 | `BRAND_NAME` | Brand naam — default `TakaTick` (Siam-er decide kora brand; ek jayga theke bodlano jay) |
 | `DB_PATH` | SQLite database file-er path |
+| `SELLER_BKASH_NUMBER` | Buyer-ra je bKash number-e Send Money korbe — Siam-er number `01740707570` (public, landing page-e dekhano hoy; env-e na dile ei number-tai fallback) |
+| `ADMIN_EMAIL` | Admin panel login email — first boot-e admin account banay |
+| `ADMIN_PASSWORD` | Admin panel login password — strong password dite hobe; na dile admin login bondho thakbe (`ADMIN_NOT_CONFIGURED`) |
 
 ## Packages
 
@@ -121,7 +142,7 @@ curl -X POST $BASE/api/v1/verify \
 
 ## Configuration
 
-- **Packages:** `config/packages.json` — tier limits (number/website count, monthly verification limit, webhook on/off). Ekhane bodlale dashboard + verify limit — duitai bodle jabe.
+- **Packages:** `config/packages.json` — tier limits (number/website count, monthly verification limit, webhook on/off) + `graceDays` (expiry-er por koto din verify cholbe — ekhon 3). Ekhane bodlale dashboard + verify limit — duitai bodle jabe.
 - **Brand:** `TakaTick` — `BRAND_NAME` env (default `TakaTick`) ba `config/packages.json` theke ase; dashboard/pay page-e config theke inject hoy. Ek jayga theke bodlano jay — page-er moddhe brand naam hardcode kora hoy na.
 
 ## Security notes
@@ -135,7 +156,7 @@ curl -X POST $BASE/api/v1/verify \
 
 ## Ki test kora hoyeche
 
-**`npm test` — 22 test, 22 pass, 0 fail** (Node v24.22.1, ~1.2s). Puro result: [TEST_REPORT.md](./TEST_REPORT.md). Coordinator nijeo `npm test` chaliye 22/22 pass verify koreche, ar server nije start kore health check koreche (`GET /api/health` → `{"ok":true}`, brand TakaTick).
+**`npm test` — 36 test, 36 pass, 0 fail** (Node v24.22.1). Puro result: [TEST_REPORT.md](./TEST_REPORT.md). v1.3-e notun: landing page, order create (wrong amount / duplicate TrxID), admin approve (package + fresh 30-day expiry) / reject, expired merchant `403 PACKAGE_EXPIRED` + pay page block, grace (1 day past expiry verify OK, 4 days past 403), deactivated merchant `403 ACCOUNT_DEACTIVATED`, admin merchants list expiry state, renewal during grace resets expiry to approval + 30d, admin login wrong password 401 + merchant token admin route-e 403 + no-admin 503. Local E2E smoke (fresh DB): signup → order → admin approve → verify → confirm — 18/18 pass.
 
 Ja pass koreche: signup/login + JWT, tier limit (Basic-e Rocket/Upay number 403, Premium-e allowed), bKash + Rocket full flow (ingest → verify → confirm → webhook HMAC), Upay pay-page claim, duplicate confirm `ALREADY_USED`, bhul amount `AMOUNT_MISMATCH`, unknown TrxID `TRANSACTION_NOT_FOUND`, duplicate SMS `duplicate:true`, 422 `UNPARSEABLE`, 401 bad app key, parser 10 fixture + 4 edge case (4 method-i, case-insensitive sender).
 
@@ -144,7 +165,7 @@ Ja pass koreche: signup/login + JWT, tier limit (Basic-e Rocket/Upay number 403,
 ## Ki test kora HOYNI (ekhono baki)
 
 - ❌ Asol SMS asol phone-e — 4 method-er kono tar asol SMS wording diye parser check kora hoyni (Rocket/Upay sender ID + wording bisesh kore re-check korte hobe).
-- ❌ Android app — **app-ta bananoi hoyni** (source/build nei). Asol phone-e install kore SMS forward kora hoyni.
-- ❌ Production deploy — server local-e choleche, production-e deploy kora hoyni.
+- ❌ Android app asol phone-e — APK v1.0 build kora hoyeche, kintu asol phone-e install kore SMS forward kora hoyni.
+- ❌ Production deploy — v1.3 code GitHub-e push kora hoyeche, kintu Render-e manual deploy kora hoyni (auto-deploy OFF).
 - ❌ Asol payment — asol taka diye end-to-end payment test kora hoyni.
-- ❌ WooCommerce plugin — plugin file-i ekhono nei; eta porer step (INTEGRATION.md Section 8 dekhun).
+- ❌ WooCommerce plugin — plugin-er PHP syntax OK (`php -l` pass), kintu WordPress + WooCommerce-e live test kora hoyni.

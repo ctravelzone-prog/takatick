@@ -9,15 +9,24 @@ Merchant-er phone-e install kora choto app. Je phone-e bKash / Nagad / Rocket / 
 
 **Privacy note (merchant-ke janate hobe):** App ta merchant-er NIJER phone-e, NIJER SMS, NIJER server-er jonno. SMS kokhono onno kothao jay na. Install korar somoy Android SMS permission chaibe — eta chara app kaj korbe na.
 
-## APK banano (Android Studio)
+## APK banano — 2-ta upay
 
+**Upay 1 — ei repo-er script (sohoj):**
+```bash
+export JAVA_HOME=$HOME/jdk17 ANDROID_HOME=$HOME/Android
+./build-apk.sh
+# Output: build-manual/TakaTickSMS.apk
+```
+Script-ta Android SDK tool (aapt2 + d8 + zipalign + apksigner) diye APK banay — Gradle download lage na. App Java-te lekha, kono third-party library nei (network = HttpURLConnection), tai dependency-o lage na.
+
+**Upay 2 — Android Studio:**
 1. Android Studio khulun → Open → ei `android-app/` folder select korun.
-2. Gradle sync hote din (internet lagbe — OkHttp library download hobe).
+2. Gradle sync hote din.
 3. Menu: **Build → Build App Bundle(s) / APK(s) → Build APK(s)**.
 4. APK paben: `app/build/outputs/apk/debug/app-debug.apk` — phone-e copy kore install korun.
 5. Release APK-er jonno signing key lagbe (Android Studio: Build → Generate Signed App Bundle / APK).
 
-> ⚠️ Ei repo-te APK build kora hoyni — ei machine-e Android SDK / Java nei, tai source-only deoa holo. APK apnake Android Studio-te banate hobe.
+> ⚠️ `build-apk.sh` ekta **DEBUG keystore** (`takatick-debug.keystore`, password `takatick-debug`) diye sign kore — **TEST-ER JONNO ONLY**. Play Store release-er jonno alada release keystore banate hobe. Debug keystore diye sign kora APK Play Store-e tola jabe na, ar ei keystore harale test build-er update dite problem hobe na (notun debug keystore-e abar build korlei hobe — kintu purono install-er upor update hobe na, uninstall kore abar install korte hobe).
 
 ## Setup (phone-e)
 

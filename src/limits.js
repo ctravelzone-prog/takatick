@@ -49,10 +49,19 @@ function methodAllowedForPackage(pkg, method) {
   return pkg.methods.includes(method);
 }
 
+/** Grace period (days) after package_expires_at during which the package
+ * still works. From config/packages.json `graceDays` — changeable there,
+ * never hardcoded in route logic. */
+function getGraceDays() {
+  const n = config.graceDays;
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 module.exports = {
   getConfig,
   getBrand,
   getPackage,
+  getGraceDays,
   limitReached,
   canAddNumber,
   canAddWebsite,

@@ -35,11 +35,29 @@ Package change kora jay dashboard theke. Limit sesh hole verify call `LIMIT_EXCE
 
 ---
 
+## 2A. Package kena / renew kora (landing page) + admin panel
+
+**Kinben kivabe (buyer):**
+1. Website-er root page (`/`) theke package choose korun → signup (naam/email/password).
+2. **bKash Send Money** korun exact package amount — number: **01740707570** (page-e dekhano thake, copy button ache).
+3. TrxID + je number theke pay korechen (sender) form-e bosiye submit korun — order `pending` hobe.
+4. Admin manually check kore approve korle package **30 din-er jonno active** hobe — dashboard-e package + expiry date dekhte paben.
+
+**Renew:** package sesh howar age ba pore dashboard-er "Upgrade / Renew package" button theke eki flow (notun order → approve → approval theke fresh 30 din, ager expiry-er sathe jog hoy na). API key ar data same thake — renew korle kichu bodlate hoy na.
+
+**Expiry + 3 din grace:** 30 din sesh hole 3 din grace period — ei somoy verify/confirm ar pay page normal cholbe, dashboard-e "Grace period — X din baki, renew koro" banner dekhabe. Grace sesh hole verify `403 PACKAGE_EXPIRED` dibe ar pay page-e expired notice dekhabe — renew korlei abar cholbe.
+
+**Admin panel (`/admin.html`):** admin login (env `ADMIN_EMAIL` / `ADMIN_PASSWORD` diye banano account) → sob merchant-er list (package, status, expiry date, expiry state: active / expiring-soon / grace / expired / no-expiry, usage), order list (pending age) — approve korle package + 30-day expiry set hoy, reject korle purono package-i thake. Admin chaile merchant-er package manually bodlate pare, ar merchant deactivate/activate korte pare (deactivated merchant-er verify/confirm bondho hoye jay).
+
+---
+
+---
+
 ## 3. Getting started (4 ta step)
 
 1. **Sign up korun dashboard-e** — naam, email, password ar package diye account khulun. Signup-er somoy apni ekbar-e paben: `apiKey`, `appKey`, `payKey`, `webhookSecret` — **egulo ekbar-i dekhano hoy, tai sathe sathe safe jaygay save kore rakhun.** Harale dashboard theke regenerate korte hobe.
 2. **Apnar number add korun (bKash, Nagad, Rocket, Upay)** — dashboard-er Numbers section-e apnar personal number (bKash, Nagad, Rocket ba Upay — je number-e taka asbe) add korun. Tier limit onujayi number add kora jabe (Basic: 1, Standard: 3, Premium: unlimited).
-3. **Android SMS app install korun** — je phone-e payment SMS ashe, oi phone-e TakaTick Android app install kore apnar `appKey` diye login korun. App-er source `android-app/` folder-e ache — Android Studio-te khule APK banan (oi folder-er README dekhun). App na thakle kono SMS server-e jabe na, ar verify kaj korbe na. (APK ekhane build kora hoyni — ei machine-e Android SDK nei.)
+3. **Android SMS app install korun** — je phone-e payment SMS ashe, oi phone-e TakaTick Android app install kore apnar `appKey` diye login korun. App-er source `android-app/` folder-e ache — Android Studio-te khule APK banan (oi folder-er README dekhun), ba dashboard-er Downloads section theke toiri APK-ta naman (`/download/app.apk`). App na thakle kono SMS server-e jabe na, ar verify kaj korbe na.
 4. **API key copy korun** — dashboard theke `apiKey` copy kore apnar website-er server-side code-e boshan. **API key kokhono browser-er JavaScript-e ba public jaygay rakhben na** — shudhu server-side.
 
 ---
@@ -154,6 +172,9 @@ Confirm korlei TrxID permanently "used" hoye jay, ar webhook fire hoy. **Verify 
 | `AMOUNT_MISMATCH` | TrxID ache, kintu amount mile nai | Exact amount-e pay korte bolun — 1 taka kom/beshi holeo hobe na |
 | `ALREADY_USED` | Ei TrxID diye age ekta order confirm hoye geche | Notun payment korte bolun — ek TrxID ekbar-i use kora jay |
 | `LIMIT_EXCEEDED` | Ei month-er verification limit sesh | Package upgrade korun |
+| `PACKAGE_EXPIRED` | Package-er meyad + 3 din grace sesh | Renew korun (dashboard theke) |
+| `ACCOUNT_DEACTIVATED` | Admin apnar account deactivate koreche | Admin-er sathe jogajog korun |
+| `DUPLICATE_TRXID` | Ei TrxID diye age ekta order deoa hoyeche | Notun payment-er TrxID din |
 
 ### PHP example
 
@@ -325,7 +346,7 @@ Premium package-e WooCommerce plugin thake — file ache: `woocommerce-plugin/ta
 - Confirm hole signed webhook-e WooCommerce order auto "Processing/Completed" hoy
 - Webhook signature (HMAC-SHA256) check kore — fake webhook-e order paid hobe na; amount-o miliye dekhe
 
-> ⚠️ Plugin-ta WordPress + WooCommerce-e live test kora hoyni — install kore ekta test order diye check korun (Section 9).
+> ⚠️ Plugin-er PHP syntax check kora hoyeche (`php -l` pass), kintu WordPress + WooCommerce-e live test kora hoyni — install kore ekta test order diye check korun (Section 9). Dashboard-er Downloads section theke plugin zip-tao nama jay (`/downloads/takatick-woocommerce-plugin.zip`).
 
 ---
 

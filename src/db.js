@@ -101,7 +101,45 @@ CREATE TABLE IF NOT EXISTS sms_unparsed (
   reason TEXT,
   created_at TEXT NOT NULL
 );
+
+-- Storefront (v1.3): package purchase orders paid to Siam's bKash.
+-- One row per buy/renew/upgrade attempt; TrxID UNIQUE so the same
+-- payment can never buy twice.
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  merchant_id INTEGER NOT NULL REFERENCES merchants(id),
+  package TEXT NOT NULL,
+  amount_poisha INTEGER NOT NULL,
+  trxid TEXT UNIQUE NOT NULL,
+  sender TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TEXT NOT NULL,
+  decided_at TEXT,
+  decided_by TEXT
+);
+
+-- Admin accounts (v1.3). Seeded from ADMIN_EMAIL / ADMIN_PASSWORD env
+-- on first boot (see server.js); passwords are bcrypt hashes, never plain.
+CREATE TABLE IF NOT EXISTS admins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `);
+
+// Migrations for DBs created before v1.3 (CREATE TABLE IF NOT EXISTS
+// never adds columns to an existing table).
+for (const sql of [
+  'ALTER TABLE merchants ADD COLUMN package_expires_at TEXT',
+  "ALTER TABLE merchants ADD COLUMN status TEXT NOT NULL DEFAULT 'active'",
+]) {
+  try {
+    db.exec(sql);
+  } catch (_e) {
+    // Column already exists — nothing to do.
+  }
+}
 
 function nowIso() {
   return new Date().toISOString();
