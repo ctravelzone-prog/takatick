@@ -88,7 +88,7 @@ label{font-size:14px;font-weight:600}
 <section>
   <div class="wrap">
     <h2 id="enrollTitle">Sign up &amp; buy a package</h2>
-    <p class="sub" id="enrollSub">Create your account, pay by bKash Send Money, submit the TrxID — admin approves and your package activates for 30 days.</p>
+    <p class="sub" id="enrollSub">Create your account, pay by bKash Send Money, submit the TrxID — payment confirm holei package active (30 din).</p>
     <div class="enroll-box" id="enrollBox">
       <div id="enrollMsg"></div>
       <div id="signupStep">
@@ -134,7 +134,23 @@ let pricingData = null;
 const params = new URLSearchParams(location.search);
 let selectedPackage = params.get('plan') || params.get('package') || 'basic';
 const msg = document.getElementById('enrollMsg');
-function showErr(o){ msg.textContent = o.ok ? '' : (o.error || 'Failed'); }
+// Buyer-facing errors stay generic and friendly — raw API codes are
+// never shown as-is. The map keys are the API codes (the frontend may
+// switch on them); the values say only what the buyer should do next.
+const FRIENDLY_ERRORS = {
+  INVALID_NAME: 'Naam-ta din.',
+  INVALID_EMAIL: 'Email-ta thik nei — abar check korun.',
+  PASSWORD_TOO_SHORT: 'Password kompokkhe 8 character hote hobe.',
+  INVALID_PHONE: 'Phone number-ta thik moto din (01XXXXXXXXX).',
+  EMAIL_EXISTS: 'Ei email diye account ache — login korun.',
+  INVALID_PACKAGE: 'Package-ta thik nei — abar try korun.',
+  INVALID_TRXID: 'TrxID-ta din — khali rakha jabe na.',
+  INVALID_SENDER: 'Je number theke pay korechen, seta thik moto din.',
+  AMOUNT_MISMATCH: 'Amount-ta thik nei — abar try korun.',
+  DUPLICATE_TRXID: 'Order-ta submit kora jay ni — dashboard-e check korun.',
+  ORDER_FAILED: 'Order-ta submit kora jay ni — abar try korun.',
+};
+function showErr(o){ msg.textContent = o.ok ? '' : (FRIENDLY_ERRORS[o.error] || 'Kichu ekta thik hoyni — abar try korun.'); }
 function fmt(n){ return n === null || n === undefined ? 'Unlimited' : n; }
 function qty(n, one, many){ return n === null || n === undefined ? 'Unlimited ' + many : n + ' ' + (n === 1 ? one : many); }
 function methodName(m){ return {bkash:'bKash',nagad:'Nagad',rocket:'Rocket',upay:'Upay'}[m] || m; }
@@ -211,7 +227,7 @@ function showPlanStep(){
 }
 function showPayStep(){
   updatePayStep();
-  setEnrollTitle('Pay by bKash Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID. Admin approves and your package activates for 30 days.');
+  setEnrollTitle('Pay by bKash Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID.');
   hideAllSteps();
   document.getElementById('payStep').style.display = 'block';
 }
@@ -252,8 +268,12 @@ document.getElementById('orderForm').addEventListener('submit', async e => {
   if(!o.ok){ showErr(o); return; }
   hideAllSteps();
   document.getElementById('pendingStep').style.display = 'block';
+  // Show success when the order comes back already approved, else the
+  // waiting message. Plain buyer language only — nothing about how.
   document.getElementById('pendingText').textContent =
-    `Order #${o.order.id} (${p.name}, ৳${p.priceBDT}) is pending. Admin approve korle package active hobe (30 din) — dashboard-e check korun.`;
+    (o.autoApproved || o.order.status === 'approved')
+      ? `Order #${o.order.id} (${p.name}, ৳${p.priceBDT}) — payment confirm hoyeche, package active (30 din) — dashboard-e check korun.`
+      : `Order #${o.order.id} (${p.name}, ৳${p.priceBDT}) — payment verify hocche, ektu wait korun — dashboard-e check korun.`;
 });
 function logout(){ localStorage.removeItem('token'); location.reload(); }
 // Renders the header profile chip from data already in hand (name +

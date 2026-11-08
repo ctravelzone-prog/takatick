@@ -358,6 +358,12 @@ app.post('/api/me/orders', auth, (req, res) => {
        VALUES (?, ?, ?, ?, ?, 'pending', ?)`
     ).run(req.merchantId, pkgId, amountPoisha, trx, String(sender).trim(), nowIso());
     const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(info.lastInsertRowid);
+    // v2.9 auto-approve: the payment SMS may already be here (it arrived
+    // before the customer submitted the order) — approve at once.
+    const approved = tryAutoApprove(trx, amountPoisha);
+    if (approved) {
+      return res.status(201).json({ ok: true, order: approved, autoApproved: true });
+    }
     return res.status(201).json({ ok: true, order: row });
   } catch (e) {
     if (String(e.message || '').includes('UNIQUE')) {
@@ -582,24 +588,58 @@ app.get('/api/admin/orders', adminAuth, (_req, res) => {
   return res.json({ ok: true, orders: rows });
 });
 
+// ---------- auto-approve (v2.9, dogfooding) ----------
+// The storefront sells TakaTick itself: a customer pays bKash Send Money
+// to the seller number, the SMS lands on the seller's phone, and the
+// server matches it to the pending order — no admin step. The FIRST order
+// of a merchant still needs a manual admin approval (that is how the
+// merchant gets their app key in the first place); every order after
+// that approves itself the moment its payment SMS arrives.
+function approveOrder(order, decidedBy) {
+  const merchant = getMerchantById(order.merchant_id);
+  if (!merchant) return null;
+  // Fresh 30 days from approval — never stacked on the old expiry.
+  // Same for new buys, renewals and upgrades (incl. renewal during grace).
+  const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
+  const decidedAt = nowIso();
+  db.prepare("UPDATE orders SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?")
+    .run(decidedAt, String(decidedBy), order.id);
+  db.prepare("UPDATE merchants SET package = ?, package_expires_at = ?, status = 'active' WHERE id = ?")
+    .run(order.package, expiresAt, merchant.id);
+  // v2.2: approval issues the keys — first time the merchant ever sees them.
+  const keys = ensureMerchantKeys(merchant.id);
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  return { order: updated, merchant: publicMerchant(getMerchantById(merchant.id)), keysIssued: keys.issued };
+}
+
+// Match a payment SMS (TrxID + exact amount ONLY — sender is not
+// checked) to a pending order, GLOBALLY across merchants: the SMS
+// arrives via the seller's phone app key, but the paying customer is a
+// different merchant. Marks the SMS 'used' first (only if a 'received'
+// row was actually changed), then approves. Returns the approved order
+// row, or null when nothing matched.
+function tryAutoApprove(trxid, amountPoisha) {
+  const order = db.prepare(
+    "SELECT * FROM orders WHERE trxid = ? AND amount_poisha = ? AND status = 'pending' ORDER BY id ASC LIMIT 1"
+  ).get(trxid, amountPoisha);
+  if (!order) return null;
+  if (!getMerchantById(order.merchant_id)) return null;
+  const marked = db.prepare(
+    "UPDATE sms_transactions SET status = 'used', used_at = ? WHERE trxid = ? AND status = 'received'"
+  ).run(nowIso(), trxid);
+  if (marked.changes === 0) return null;
+  const result = approveOrder(order, 'auto');
+  return result ? result.order : null;
+}
+
 app.post('/api/admin/orders/:id/approve', adminAuth, (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!order) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   if (order.status !== 'pending') return res.status(409).json({ ok: false, error: 'ORDER_ALREADY_DECIDED' });
   const merchant = getMerchantById(order.merchant_id);
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  // Fresh 30 days from approval — never stacked on the old expiry.
-  // Same for new buys, renewals and upgrades (incl. renewal during grace).
-  const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
-  const decidedAt = nowIso();
-  db.prepare("UPDATE orders SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?")
-    .run(decidedAt, String(req.adminId), order.id);
-  db.prepare("UPDATE merchants SET package = ?, package_expires_at = ?, status = 'active' WHERE id = ?")
-    .run(order.package, expiresAt, merchant.id);
-  // v2.2: approval issues the keys — first time the merchant ever sees them.
-  const keys = ensureMerchantKeys(merchant.id);
-  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
-  return res.json({ ok: true, order: updated, merchant: publicMerchant(getMerchantById(merchant.id)), keysIssued: keys.issued });
+  const result = approveOrder(order, String(req.adminId));
+  return res.json({ ok: true, order: result.order, merchant: result.merchant, keysIssued: result.keysIssued });
 });
 
 app.post('/api/admin/orders/:id/reject', adminAuth, (req, res) => {
@@ -999,6 +1039,11 @@ app.post('/api/sms', (req, res) => {
   if (result.changes === 0) {
     return res.json({ ok: true, duplicate: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
   }
+  // v2.9 auto-approve: a storefront order may be waiting for this payment.
+  const approved = tryAutoApprove(parsed.trxid, parsed.amountPoisha);
+  if (approved) {
+    return res.json({ ok: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha), autoApproved: true, orderId: approved.id });
+  }
   return res.json({ ok: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
 });
 
@@ -1028,6 +1073,12 @@ app.post('/api/me/sms-paste', auth, (req, res) => {
   ).run(merchant.id, parsed.trxid, parsed.method, parsed.senderNumber, parsed.amountPoisha, nowIso(), text, nowIso());
   if (result.changes === 0) {
     return res.json({ ok: true, duplicate: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
+  }
+  // v2.9 auto-approve: same as the app ingest — a storefront order may be
+  // waiting for this pasted payment SMS.
+  const approved = tryAutoApprove(parsed.trxid, parsed.amountPoisha);
+  if (approved) {
+    return res.json({ ok: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha), autoApproved: true, orderId: approved.id });
   }
   return res.json({ ok: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
 });

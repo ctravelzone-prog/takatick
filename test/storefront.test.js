@@ -852,3 +852,165 @@ test('v2.8.1: dashboard offers APK v1.5 (foreground service + 2s scan) + Play Pr
   assert.match(d.text, /APK v1.5/);
   assert.match(d.text, /Play Protect/);
 });
+
+// ---------- auto-approve (v2.9, dogfooding) ----------
+// The seller is activated MANUALLY (admin approve) — that is how they get
+// the app key for the phone that receives payments. Every customer order
+// after that approves itself the moment its payment SMS arrives.
+let autoSeller = null;
+async function setupAutoSeller() {
+  if (autoSeller) return autoSeller;
+  autoSeller = await signup('Auto Seller', 'seller-auto@takatick.test', 'basic');
+  await activateMerchant(autoSeller.token, 'basic', 'AUTO-SELLER-ACT');
+  Object.assign(autoSeller, await fetchKeys(autoSeller.token));
+  return autoSeller;
+}
+
+function autoSmsText(amountBdt, trxid) {
+  return `You have received Tk ${amountBdt}.00 from 01712345678. Fee Tk 0.00. Balance Tk 500.00. TrxID ${trxid} at 09/11/2026 00:30`;
+}
+
+test('v2.9 auto-approve: matching SMS after order approves it, marks SMS used', async () => {
+  const s = await setupAutoSeller();
+  const customer = await signup('Auto Customer 1', 'auto-cust-1@takatick.test', 'basic');
+  const order = await req('/api/me/orders', {
+    method: 'POST', token: customer.token,
+    body: { package: 'basic', trxid: 'AUTO00001', sender: SELLER_BKASH, amount: 300 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  assert.equal(order.json.order.status, 'pending');
+  const ingest = await req('/api/sms', {
+    method: 'POST', appKey: s.appKey,
+    body: { sender: 'bKash', text: autoSmsText(300, 'AUTO00001') },
+  });
+  assert.equal(ingest.json.ok, true, JSON.stringify(ingest.json));
+  assert.equal(ingest.json.autoApproved, true);
+  assert.equal(ingest.json.orderId, order.json.order.id);
+  const orders = await req('/api/me/orders', { token: customer.token });
+  const mine = orders.json.orders.find((o) => o.id === order.json.order.id);
+  assert.equal(mine.status, 'approved');
+  assert.equal(mine.decided_by, 'auto');
+  const profile = await req('/api/me/profile', { token: customer.token });
+  assert.equal(profile.json.merchant.status, 'active');
+  assert.equal(profile.json.merchant.package, 'basic');
+  const days = (new Date(profile.json.packageExpiresAt).getTime() - Date.now()) / (24 * 3600 * 1000);
+  assert.ok(days > 29 && days <= 30, `expiry ~30d, got ${days}`);
+  const txns = await req('/api/me/transactions', { token: s.token });
+  const sms = txns.json.transactions.find((t) => t.trxid === 'AUTO00001');
+  assert.ok(sms, 'ingested SMS row exists');
+  assert.equal(sms.status, 'used');
+});
+
+test('v2.9 auto-approve: SMS arrives first, order created after is approved at once', async () => {
+  const s = await setupAutoSeller();
+  const ingest = await req('/api/sms', {
+    method: 'POST', appKey: s.appKey,
+    body: { sender: 'bKash', text: autoSmsText(600, 'AUTO00002') },
+  });
+  assert.equal(ingest.json.ok, true, JSON.stringify(ingest.json));
+  assert.equal(ingest.json.autoApproved, undefined);
+  const customer = await signup('Auto Customer 2', 'auto-cust-2@takatick.test', 'standard');
+  const order = await req('/api/me/orders', {
+    method: 'POST', token: customer.token,
+    body: { package: 'standard', trxid: 'AUTO00002', sender: SELLER_BKASH, amount: 600 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  assert.equal(order.json.autoApproved, true);
+  assert.equal(order.json.order.status, 'approved');
+  const profile = await req('/api/me/profile', { token: customer.token });
+  assert.equal(profile.json.merchant.status, 'active');
+  assert.equal(profile.json.merchant.package, 'standard');
+});
+
+test('v2.9 auto-approve: SMS with wrong amount does not approve the order', async () => {
+  const s = await setupAutoSeller();
+  const customer = await signup('Auto Customer 3', 'auto-cust-3@takatick.test', 'basic');
+  const order = await req('/api/me/orders', {
+    method: 'POST', token: customer.token,
+    body: { package: 'basic', trxid: 'AUTO00003', sender: SELLER_BKASH, amount: 300 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  const ingest = await req('/api/sms', {
+    method: 'POST', appKey: s.appKey,
+    body: { sender: 'bKash', text: autoSmsText(100, 'AUTO00003') },
+  });
+  assert.equal(ingest.json.ok, true, JSON.stringify(ingest.json));
+  assert.equal(ingest.json.autoApproved, undefined);
+  const orders = await req('/api/me/orders', { token: customer.token });
+  const mine = orders.json.orders.find((o) => o.id === order.json.order.id);
+  assert.equal(mine.status, 'pending');
+  const txns = await req('/api/me/transactions', { token: s.token });
+  const sms = txns.json.transactions.find((t) => t.trxid === 'AUTO00003');
+  assert.ok(sms, 'ingested SMS row exists');
+  assert.equal(sms.status, 'received');
+});
+
+test('v2.9 auto-approve: SMS with unknown TrxID approves nothing, stays received', async () => {
+  const s = await setupAutoSeller();
+  const ingest = await req('/api/sms', {
+    method: 'POST', appKey: s.appKey,
+    body: { sender: 'bKash', text: autoSmsText(300, 'AUTO99999') },
+  });
+  assert.equal(ingest.json.ok, true, JSON.stringify(ingest.json));
+  assert.equal(ingest.json.autoApproved, undefined);
+  const txns = await req('/api/me/transactions', { token: s.token });
+  const sms = txns.json.transactions.find((t) => t.trxid === 'AUTO99999');
+  assert.ok(sms, 'ingested SMS row exists');
+  assert.equal(sms.status, 'received');
+});
+
+test('v2.9 auto-approve: pasted SMS also auto-approves the matching order', async () => {
+  const s = await setupAutoSeller();
+  const customer = await signup('Auto Customer 5', 'auto-cust-5@takatick.test', 'basic');
+  const order = await req('/api/me/orders', {
+    method: 'POST', token: customer.token,
+    body: { package: 'basic', trxid: 'AUTO00005', sender: SELLER_BKASH, amount: 300 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  const paste = await req('/api/me/sms-paste', {
+    method: 'POST', token: s.token,
+    body: { text: autoSmsText(300, 'AUTO00005') },
+  });
+  assert.equal(paste.json.ok, true, JSON.stringify(paste.json));
+  assert.equal(paste.json.autoApproved, true);
+  assert.equal(paste.json.orderId, order.json.order.id);
+  const orders = await req('/api/me/orders', { token: customer.token });
+  const mine = orders.json.orders.find((o) => o.id === order.json.order.id);
+  assert.equal(mine.status, 'approved');
+  assert.equal(mine.decided_by, 'auto');
+});
+
+test('v2.9 auto-approve: admin approve still works exactly as before', async () => {
+  const customer = await signup('Auto Customer 6', 'auto-cust-6@takatick.test', 'premium');
+  const order = await req('/api/me/orders', {
+    method: 'POST', token: customer.token,
+    body: { package: 'premium', trxid: 'AUTO00006', sender: SELLER_BKASH, amount: 900 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  assert.equal(order.json.autoApproved, undefined);
+  const approved = await approveOrder(order.json.order.id);
+  assert.equal(approved.order.status, 'approved');
+  assert.equal(approved.merchant.package, 'premium');
+  assert.equal(approved.keysIssued, true);
+  const again = await req(`/api/admin/orders/${order.json.order.id}/approve`, {
+    method: 'POST', token: adminToken, body: {},
+  });
+  assert.equal(again.status, 409);
+  assert.equal(again.json.error, 'ORDER_ALREADY_DECIDED');
+});
+
+test('v2.9 buyer copy: enroll shows plain buyer language only, never the mechanism', async () => {
+  const e = await req('/enroll.html');
+  assert.equal(e.status, 200);
+  // Exact buyer-facing copy (plain language only).
+  assert.match(e.text, /payment verify hocche/);
+  assert.match(e.text, /payment confirm hoyeche, package active/);
+  assert.match(e.text, /FRIENDLY_ERRORS/);
+  // No mechanism words anywhere on the buyer-facing page: no admin actor,
+  // no SMS/app talk, no verification-mechanism wording, and errors are
+  // never shown as raw API codes.
+  assert.doesNotMatch(e.text, /Admin/);
+  assert.doesNotMatch(e.text, /SMS/);
+  assert.doesNotMatch(e.text, /payment verified/);
+  assert.doesNotMatch(e.text, /\(o\.error \|\| 'Failed'\)/);
+});
