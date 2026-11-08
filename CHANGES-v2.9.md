@@ -17,9 +17,10 @@
 - Buyer jeno system-ta kivabe kaj kore bujhte na pare: enroll-er pending/success copy sudhu plain buyer language — "payment verify hocche" / "payment confirm hoyeche, package active" — SMS, phone app, server matching, auto-approve, TrxID+amount rule-er kono ullekh nei (page-er JS comment-eo nei — served file-er comment buyer view-source-e dekhte pay)।
 - Order error-e API code bodlay ni, kintu buyer-ke raw code (`AMOUNT_MISMATCH`, `DUPLICATE_TRXID`...) ar dekhano hoy na — `FRIENDLY_ERRORS` map-e generic friendly Banglish dekhay (map-er key code, value sudhu buyer-ke ki korte hobe)।
 - v2.9-e buyer-facing kothao mechanism-er kono explanation jog hoy ni। Test-e guard ache: enroll.html-e 'Admin'/'SMS'/'payment verified'/raw-code display thakle test fail kore।
+- Landing page-eo (hero, How-it-works, FAQ) mechanism-er bhasha sorano hoyeche — 'forwarded SMS', 'TrxID + exact amount', 'manual approval', 'Admin approves', 'reads the payment SMS', raw code `ALREADY_USED` ar nei; 'Who approves my package' FAQ ekhon plain language-e ('Payment confirm howar sathe sathe package active'), ar stale 'manual' dabio nei। Test-e guard ache: landing-e oi shobdo thakle test fail kore।
 
 ## Tests
-- 7-ta notun test (72/72 pass): SMS pore asle approve + SMS used; SMS age asle order toiri howar sathe sathe approve; vul amount-e pending thake; ochena TrxID-e kichu approve hoy na, SMS received thake; paste-eo auto-approve; admin approve ager motoi kaj kore (409 ORDER_ALREADY_DECIDED soho); buyer-copy guard।
+- 8-ta notun test (73/73 pass): SMS pore asle approve + SMS used; SMS age asle order toiri howar sathe sathe approve; vul amount-e pending thake; ochena TrxID-e kichu approve hoy na, SMS received thake; paste-eo auto-approve; admin approve ager motoi kaj kore (409 ORDER_ALREADY_DECIDED soho); buyer-copy guard (enroll + landing)!
 
 ## Deploy note
 - Deploy-e Render-er ephemeral DB muche jay (ager motoi) — demo account notun kore banate hobe, app key bodle jabe, app-e notun key bosate hobe।

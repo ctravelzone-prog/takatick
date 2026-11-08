@@ -140,12 +140,12 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
     <div class="hero-copy">
       <span class="hero-eyebrow">✓ bKash · Nagad · Rocket · Upay</span>
       <h1>Every MFS payment, <span class="accent">verified automatically.</span></h1>
-      <p>{{BRAND}} checks every payment your customers send to your own personal number — TrxID + exact amount, no manual checking, no holding your money.</p>
+      <p>{{BRAND}} verifies every payment your customers send to your own personal number — automatically, no manual checking, no holding your money.</p>
       <div class="cta">
         <a class="btn big" href="/signup.html" id="heroSignup">Sign up — start verifying</a>
         <a class="btn big ghost" href="#pricing">See pricing</a>
       </div>
-      <p class="hero-trust">No per-transaction fee &nbsp;·&nbsp; Your money stays with you &nbsp;·&nbsp; Manual approval</p>
+      <p class="hero-trust">No per-transaction fee &nbsp;·&nbsp; Your money stays with you &nbsp;·&nbsp; Automatic verification</p>
     </div>
     <div class="hero-img"><img src="/images/hero.png" alt="A payment SMS on a phone turning into a verified checkmark"></div>
   </div>
@@ -156,8 +156,8 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
     <h2>Everything you need to accept MFS payments</h2>
     <p class="sub">Built for small and medium Bangladeshi websites that take bKash, Nagad, Rocket or Upay — without checking every TrxID by hand.</p>
     <div class="cards">
-      <div class="card"><img src="/images/feature-sms.png" alt="SMS app"><h3>All 4 MFS via SMS app</h3><p>Install the {{BRAND}} SMS app on the phone that receives payment SMS. bKash, Nagad, Rocket and Upay SMS are forwarded to the server automatically — nothing else is read or sent.</p></div>
-      <div class="card"><img src="/images/feature-api.png" alt="Verify and Confirm API"><h3>Verify + Confirm API</h3><p>Two-step API: <code>verify</code> checks TrxID + exact amount, <code>confirm</code> marks it used forever. One TrxID can never pay twice.</p></div>
+      <div class="card"><img src="/images/feature-sms.png" alt="SMS app"><h3>All 4 MFS via SMS app</h3><p>Install the {{BRAND}} SMS app on the phone that receives payment SMS. bKash, Nagad, Rocket and Upay payments are verified automatically — nothing else is read or sent.</p></div>
+      <div class="card"><img src="/images/feature-api.png" alt="Verify and Confirm API"><h3>Verify + Confirm API</h3><p>Two-step API: <code>verify</code> checks the payment, <code>confirm</code> marks it used forever. One TrxID can never pay twice.</p></div>
       <div class="card"><img src="/images/feature-paypage.png" alt="Hosted pay page"><h3>Hosted pay page</h3><p>No code needed — share your pay link. Customers see your numbers with copy buttons, pay from their MFS app, and submit the TrxID.</p></div>
       <div class="card"><img src="/images/feature-webhook.png" alt="HMAC-signed webhook"><h3>HMAC-signed webhook</h3><p>On every confirmed payment your site gets a signed <code>payment.confirmed</code> event — verify the signature and mark the order paid.</p></div>
       <div class="card"><img src="/images/feature-woocommerce.png" alt="WooCommerce plugin"><h3>WooCommerce plugin</h3><p>Premium includes a ready WooCommerce gateway: checkout shows bKash / Nagad / Rocket / Upay and orders complete automatically on webhook.</p></div>
@@ -171,9 +171,9 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
     <h2>How it works — 3 steps</h2>
     <p class="sub">From sign-up to your first auto-verified payment in minutes.</p>
     <div class="steps">
-      <div class="step"><div class="n">1</div><h3>Sign up &amp; pick a package</h3><p>Create your account below, choose Basic, Standard or Premium, and pay the monthly fee by bKash Send Money. Admin approves — your package activates for 30 days.</p></div>
+      <div class="step"><div class="n">1</div><h3>Sign up &amp; pick a package</h3><p>Create your account below, choose Basic, Standard or Premium, and pay the monthly fee by bKash Send Money. Payment confirm holei package active hoye jay 30 diner jonno.</p></div>
       <div class="step"><div class="n">2</div><h3>Add your number + install the app</h3><p>Add your bKash / Nagad / Rocket / Upay number in the dashboard and install the {{BRAND}} SMS app on the phone that receives payment SMS. Download it from your dashboard.</p></div>
-      <div class="step"><div class="n">3</div><h3>Payments verify themselves</h3><p>Customers pay to your number and submit the TrxID. {{BRAND}} matches it against the forwarded SMS — amount, method, one-time use — and confirms the order.</p></div>
+      <div class="step"><div class="n">3</div><h3>Payments verify themselves</h3><p>Customers pay to your number and submit the TrxID. {{BRAND}} verifies the payment and confirms the order automatically.</p></div>
     </div>
   </div>
 </section>
@@ -190,12 +190,12 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
   <div class="wrap">
     <h2>Frequently asked questions</h2>
     <div class="faq">
-      <details><summary>Where does the customer's money go?</summary><p>Straight to <strong>your own</strong> bKash / Nagad / Rocket / Upay personal number. {{BRAND}} never holds, touches or routes your money — it only reads the payment SMS and verifies TrxID + amount.</p></details>
-      <details><summary>Can one TrxID pay twice?</summary><p>No. One TrxID can be confirmed exactly once. A second attempt with the same TrxID is rejected (<code>ALREADY_USED</code>).</p></details>
-      <details><summary>Who approves my package, and how long does it take?</summary><p>Approval is <strong>manual</strong> — the admin checks your bKash payment (TrxID + amount) and approves the order. Once approved, your package is active for 30 days and you can see it in your dashboard.</p></details>
+      <details><summary>Where does the customer's money go?</summary><p>Straight to <strong>your own</strong> bKash / Nagad / Rocket / Upay personal number. {{BRAND}} never holds, touches or routes your money — it only verifies the payment.</p></details>
+      <details><summary>Can one TrxID pay twice?</summary><p>No. One TrxID can be confirmed exactly once — a second attempt with the same TrxID is rejected.</p></details>
+      <details><summary>Who approves my package, and how long does it take?</summary><p>Payment confirm howar sathe sathe package active hoye jay 30 diner jonno — dashboard-e dekhte parben. Prothom order-e ektu somoy lagte pare.</p></details>
       <details><summary>What happens when my package expires?</summary><p>Your package runs for 30 days from approval. After expiry you get a <strong>3-day grace period</strong> — verification keeps working while you renew. After the grace period ends, verification stops until you renew. Your API keys and data are never deleted — renewal reuses the same keys.</p></details>
       <details><summary>Can I get a refund?</summary><p>Before approval, ask the admin to cancel your pending order. Once approved and the package is active, the monthly fee is not refundable — please check the package facilities before paying.</p></details>
-      <details><summary>Does it work without the SMS app?</summary><p>No. The SMS app is what brings the payment SMS to the server. Without it, there is nothing to verify against. Download it from your dashboard after signing up.</p></details>
+      <details><summary>Does it work without the SMS app?</summary><p>No — the SMS app is required. Download it from your dashboard after signing up.</p></details>
     </div>
   </div>
 </section>

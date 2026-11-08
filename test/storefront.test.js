@@ -1014,3 +1014,19 @@ test('v2.9 buyer copy: enroll shows plain buyer language only, never the mechani
   assert.doesNotMatch(e.text, /payment verified/);
   assert.doesNotMatch(e.text, /\(o\.error \|\| 'Failed'\)/);
 });
+
+test('v2.9 buyer copy: landing page hides the mechanism (no SMS matching, no manual-approval claim)', async () => {
+  const l = await req('/');
+  assert.equal(l.status, 200);
+  // New buyer-facing approval copy (plain language, no mechanism).
+  assert.match(l.text, /Payment confirm howar sathe sathe package active/);
+  // No mechanism wording anywhere on the landing page.
+  assert.doesNotMatch(l.text, /forwarded SMS/);
+  assert.doesNotMatch(l.text, /reads the payment SMS/);
+  assert.doesNotMatch(l.text, /ALREADY_USED/);
+  assert.doesNotMatch(l.text, /Manual approval/);
+  assert.doesNotMatch(l.text, /matches it against/);
+  assert.doesNotMatch(l.text, /TrxID \+ exact amount/);
+  assert.doesNotMatch(l.text, /Admin approves/);
+  assert.doesNotMatch(l.text, /checks your bKash payment/);
+});
