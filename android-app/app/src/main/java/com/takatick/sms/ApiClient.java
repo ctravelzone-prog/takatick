@@ -43,8 +43,31 @@ public class ApiClient {
         return postSmsTo(baseUrl, appKey, sender, text);
     }
 
-    /** Test button-er jonno: direct URL + key diye pathano. */
+    /** Test button-er jonno: direct URL + key diye pathano.
+     * v1.4: 3 bar chesta — Render free tier ghumale prothom POST
+     * connect timeout-e (10s) fail korte pare; ekbar fail manei SMS
+     * harano noy, 2s pore abar pathano hoy. Duijon caller-i (SmsReceiver
+     * ar Test button) background thread theke dake, tai sleep safe. */
     public static boolean postSmsTo(String baseUrl, String appKey, String sender, String text) {
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            if (postSmsOnce(baseUrl, appKey, sender, text)) {
+                return true;
+            }
+            if (attempt < 3) {
+                Log.w(TAG, "POST /api/sms chesta " + attempt + " fail — 2s pore abar");
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Ekbar POST /api/sms — 2xx hole true. */
+    private static boolean postSmsOnce(String baseUrl, String appKey, String sender, String text) {
         HttpURLConnection conn = null;
         try {
             JSONObject payload = new JSONObject();

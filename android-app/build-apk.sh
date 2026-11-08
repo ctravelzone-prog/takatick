@@ -11,13 +11,13 @@
 # Usage:
 #   export JAVA_HOME=$HOME/jdk17 ANDROID_HOME=$HOME/Android
 #   ./build-apk.sh            # debug-signed test build (default)
-#   RELEASE=1 ./build-apk.sh  # RELEASE build (v1.1): signed with the
+#   RELEASE=1 ./build-apk.sh  # RELEASE build (v1.4): signed with the
 #                             # release keystore (takatick-release.keystore).
 #                             # The keystore password lives ONLY in
 #                             # android-app/.release-keystore-pass (gitignored,
 #                             # never in git/zips) or in RELEASE_STORE_PASS.
 # Output: build-manual/TakaTickSMS.apk (debug) or
-#         build-manual/TakaTickSMS-v2.0.apk (release)
+#         build-manual/TakaTickSMS-v1.4.apk (release)
 #
 # Signing: the debug build uses a DEBUG keystore (takatick-debug.keystore,
 # password "takatick-debug") — TEST-ER JONNO ONLY. The release build uses
@@ -47,7 +47,7 @@ if [ "${RELEASE:-0}" = "1" ]; then
     STORE_PASS="$(cat "$APP_DIR/.release-keystore-pass")"
   fi
   KEY_PASS="$STORE_PASS"
-  OUT_APK="TakaTickSMS-v2.0.apk"
+  OUT_APK="TakaTickSMS-v1.4.apk"
   echo "== RELEASE build (release keystore) -> $OUT_APK =="
 else
   STORE_FILE="$APP_DIR/takatick-debug.keystore"
@@ -82,10 +82,7 @@ echo "== 3. javac (Java sources + R.java) =="
 "$JAVA_HOME/bin/javac" -encoding UTF-8 -d "$BUILD/classes" \
     -cp "$PLATFORM" -sourcepath "$BUILD/classes" \
     "$APP_DIR/app/src/main/java/com/takatick/sms/MainActivity.java" \
-    "$APP_DIR/app/src/main/java/com/takatick/sms/SmsConsent.java" \
-    "$APP_DIR/app/src/main/java/com/takatick/sms/ConsentReceiver.java" \
-    "$APP_DIR/app/src/main/java/com/takatick/sms/SmsListenerService.java" \
-    "$APP_DIR/app/src/main/java/com/takatick/sms/BootReceiver.java" \
+    "$APP_DIR/app/src/main/java/com/takatick/sms/SmsReceiver.java" \
     "$APP_DIR/app/src/main/java/com/takatick/sms/ApiClient.java" \
     "$BUILD/classes/com/takatick/sms/R.java"
 

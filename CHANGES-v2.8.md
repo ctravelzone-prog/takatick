@@ -1,45 +1,53 @@
-# TakaTick v2.8 — APK v2.0: KONO SMS permission nei (Consent API) + dashboard SMS paste
+# TakaTick v2.8 (revised) — APK v1.4: RECEIVE_SMS full-auto + retry + content-based payment recognition; dashboard SMS paste
 
-Siam-er kotha: eto pain niye keu app nite chaibe na, product sell hobe
-na. Thik — sideload + Play Protect + restricted settings + permission
-dialog — ei rasta-ta merchant-der jonno cholbe na.
+## Keno revised
+v2.8-er prothom plan (APK v2.0, SMS User Consent API) Siam reject koreche —
+proti payment SMS-e ekbar Allow tap kora auto noy, product-er mane-i thake
+na. Sideload v1.3-i (RECEIVE_SMS, puro automatic) thakbe; consent app-er
+code repo theke sorano hoyeche.
 
-## Onno way (v2.0 app)
-SMS User Consent API (Google Play Services): app SMS permission-i chay
-na. Payment SMS asle Android nije ekta dialog dekhay ("Allow TakaTick
-SMS to read this message?") — merchant ekbar Allow chaplei oi SMS-ta
-server-e jay.
-- Install sadharon app-er moto: Play Protect-er SMS block nei (manifest-e
-  SMS permission-i nei), restricted settings nei, permission dialog nei.
-- Foreground service listening chalu rakhe (notification dekhabe);
-  phone restart hole BootReceiver abar chalu kore.
-- Play Services library compile-e lage na — reflection-e daka hoy, tai
-  manual aapt2/d8 build-e kono extra AAR lage na.
-- APK v2.0: versionCode 5, versionName 2.0, eki release keystore
-  (signer CN=TakaTick, v2+v3), md5 `c12f36059325f03b442cd575aa90ab6c`.
-  Permissions: INTERNET + FOREGROUND_SERVICE(+DATA_SYNC) +
-  RECEIVE_BOOT_COMPLETED — SMS permission SHUNNO (aapt2 diye verify).
+## Asol phone-e v1.3 keno fail korlo
+Asol bKash SMS (TrxID DK848KW31K, Tk 10.00, 8 Nov 23:20) phone-e eseche,
+permission deoa chilo, settings save chilo — tobuo v1.3 app server-e
+pathayni (server direct POST-e thik ache, curl diye promanito).
+Duto sombhabbo karon:
+1. Ekbar-er POST: Render free tier ghumale prothom request connect
+   timeout-e (10s) fail kore — ar kono retry chilo na, SMS-ta harie jeto.
+2. Sender filter: sender recognized MFS list-e na thakle purono code
+   SMS-ta chupchap fele dito — body dekheo na.
 
-## Tradeoff (sotyi kotha)
-Puro automatic ar na — proti payment SMS-e ekbar Allow tap korte hobe.
-Kintu install-er pain SHUNNO, ar ekbar tap kora proti payment-e merchant-er
-jonno choto kaj. Eita-i Google-er sanctioned rasta SMS porar jonno.
+## APK v1.4 — fix
+- Retry: `ApiClient.postSmsTo` ekhon 3 bar chesta kore (2s gap) — POST
+  fail ba non-2xx hole abar pathay. Duijon caller-i (SmsReceiver ar
+  Test button) background thread theke dake, tai sleep safe.
+- Content-based payment recognition (`SmsReceiver.looksLikePaymentSms`):
+  sender ID ja-i hok, body-r bhasha diye payment SMS chena hoy —
+  "received" + "Tk" + amount (Tk 10.00) + "TrxID", ba bKash/Nagad/
+  Rocket/Upay-er naam thakleo forward hoy. Vul forward holeo khoti nei —
+  server-e parse na hole 422 UNPARSEABLE hoye sms_unparsed-e jabe,
+  transaction banbe na.
+- Inbox pora hoy NA (READ_SMS nei) — manifest receiver protita SMS
+  live-ei dhore, tai notun payment SMS sobsomoy paoa jay; inbox reading
+  anle Play Protect block fire asbe.
+- APK v1.4: versionCode 5, versionName 1.4, eki release keystore
+  (signer CN=TakaTick, SHA-256 b2afc07e28f5e7c0194407b14eefb7ebb8178517df3ec993c11c96a95f3ce36c,
+  v2+v3), md5 `eeeee5557283b132053a79b1db307027`, 16,811 bytes.
+  Permissions: RECEIVE_SMS + INTERNET shudhu (aapt2 diye verify).
 
-## No-app fallback: dashboard-e SMS paste
+## No-app fallback: dashboard-e SMS paste (v2.8 theke rakha)
 Merchant chaile app charai cholbe: messaging app theke payment SMS copy
 kore dashboard-er "Received SMS transactions" box-e paste korle server
 seta parse kore transaction banay — tarpor verify/confirm ager motoi
 chole. Endpoint: `POST /api/me/sms-paste` (auth + plan-off block;
 duplicate TrxID block; 422 UNPARSEABLE).
-- Consent API SMS-er sender dey na, sudhu text dey — tai parser bodlano:
-  method na bojha geleo amount + TrxID thik thakle method 'unknown'
-  hisebe rakha hoy (verify TrxID + amount diyei hoy).
+- Parser tolerant: method na bojha geleo amount + TrxID thik thakle
+  method 'unknown' hisebe rakha hoy (verify TrxID + amount diyei hoy,
+  method sudhu display/record-er jonno).
 
 ## Test
-- `npm test` — 65/65 pass (64 + 1 notun paste test: 401/400/422,
+- `npm test` — 65/65 pass (64 + 1 paste test: 401/400/422,
   bkash paste, duplicate, unknown-method paste, verify+confirm full loop).
-- `aapt2 dump badging`: versionCode 5 / 2.0, SMS permission nei.
-  `apksigner verify`: v2+v3 true.
-- Consent dialog-er asol phone flow (Allow tap → forward) ekhane test
-  kora jay na (phone + Play Services lage) — Siam-er phone-ei prothom
-  live test hobe; paste path-ta server test-e puropuri verify kora.
+- `aapt2 dump badging`: versionCode 5 / 1.4, permissions RECEIVE_SMS +
+  INTERNET shudhu. `apksigner verify`: v2+v3 true.
+- Asol phone-e v1.4-er live test ekhono baki — Siam-er phone-e asol
+  payment SMS diye prothom test hobe (deploy-er por).
