@@ -609,3 +609,28 @@ test('admin login returns ADMIN_NOT_CONFIGURED when no admin exists', async () =
   assert.equal(r.status, 503);
   assert.equal(r.json.error, 'ADMIN_NOT_CONFIGURED');
 });
+
+test('v1.9 plan-choose step: 3-card picker with featured Premium + hidden radios', async () => {
+  const home = await req('/');
+  assert.match(home.text, /id="enrollBox"/);
+  assert.match(home.text, /plan-grid/);
+  assert.match(home.text, /plan-card/);
+  assert.match(home.text, /plan-ribbon/);
+  assert.match(home.text, /Most Popular/);
+  assert.match(home.text, /plan-selected-badge/);
+  assert.match(home.text, /method-chip/);
+  assert.match(home.text, /renderPlanOptions/);
+  assert.match(home.text, /enroll-box\.wide/);
+  assert.match(home.text, /classList\.add\('wide'\)/);
+  // Radio inputs stay in the DOM (visually hidden, name="plan") so the
+  // existing selection logic keeps working.
+  assert.match(home.text, /type="radio" name="plan"/);
+  // Cards are ordered Basic → Standard → Premium in the renderer.
+  assert.match(home.text, /\['basic','standard','premium'\]/);
+  // Wizard contract intact.
+  assert.match(home.text, /id="planStep"/);
+  assert.match(home.text, /id="planOptions"/);
+  assert.match(home.text, /confirmPlan\(\)/);
+  assert.match(home.text, /Continue to payment/);
+  assert.match(home.text, /You can change the plan before paying/);
+});

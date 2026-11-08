@@ -72,6 +72,32 @@ section .sub{color:var(--muted);text-align:center;max-width:640px;margin:0 auto 
 .faq summary{font-weight:700;cursor:pointer;color:var(--navy)}
 .faq p{color:#4A5A68;line-height:1.6}
 .enroll-box{max-width:560px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 8px 28px rgba(10,27,46,.08)}
+.enroll-box.wide{max-width:980px}
+/* Step 2 plan picker (v1.9): 3 cards side by side, Premium featured navy */
+.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding-top:14px;margin-bottom:16px}
+.plan-card{position:relative;display:flex;flex-direction:column;gap:5px;background:var(--card);border:2px solid var(--line);border-radius:16px;padding:22px 18px 18px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;text-align:left}
+.plan-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(10,27,46,.12)}
+.plan-card input{position:absolute;opacity:0;pointer-events:none}
+.plan-card.selected{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft),0 12px 28px rgba(13,148,136,.20)}
+.plan-card.featured{background:var(--navy);border-color:var(--teal);color:#fff;transform:translateY(-8px)}
+.plan-card.featured:hover{transform:translateY(-11px)}
+.plan-card.featured .plan-name,.plan-card.featured .plan-price{color:#fff}
+.plan-card.featured .plan-feat{color:#D7E2EA}
+.plan-card.featured .plan-feat.off{color:rgba(255,255,255,.45)}
+.plan-card.featured .plan-per-month{color:#8FA3B5}
+.plan-card.featured .plan-divider{background:rgba(255,255,255,.18)}
+.plan-ribbon{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--amber);color:var(--navy);font-size:12px;font-weight:700;border-radius:20px;padding:4px 12px;white-space:nowrap}
+.plan-selected-badge{position:absolute;top:10px;right:10px;background:var(--teal);color:#fff;font-size:12px;font-weight:700;border-radius:20px;padding:3px 10px}
+.plan-name{font-family:'Space Grotesk',system-ui,sans-serif;font-size:19px;font-weight:700;color:var(--navy)}
+.plan-price{font-family:'Space Grotesk',system-ui,sans-serif;font-size:34px;font-weight:700;color:var(--navy);line-height:1.1}
+.plan-price .plan-per{font-size:15px;font-weight:600;opacity:.65}
+.plan-per-month{font-size:13px;color:var(--muted)}
+.plan-divider{height:1px;background:var(--line);margin:8px 0}
+.plan-feat{font-size:14px;color:#4A5A68;line-height:1.5}
+.plan-feat.off{color:#9AA8B2}
+.plan-methods{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.method-chip{background:var(--teal-soft);color:var(--teal-dark);font-size:12px;font-weight:700;border-radius:20px;padding:3px 10px}
+.plan-card.featured .method-chip{background:rgba(45,212,191,.16);color:var(--teal-bright)}
 input,select{width:100%;padding:11px;margin:6px 0 12px;border:1px solid #CBD8DB;border-radius:10px;font-size:15px}
 input:focus,select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 label{font-size:14px;font-weight:600}
@@ -88,6 +114,9 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
   .hero{padding:48px 0}
   .hero h1{font-size:32px}
   .nav a.link{display:none}
+  .plan-grid{grid-template-columns:1fr}
+  .plan-card.featured{transform:none}
+  .plan-card.featured:hover{transform:translateY(-3px)}
 }
 </style>
 </head>
@@ -161,7 +190,7 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
   <div class="wrap">
     <h2 id="enrollTitle">Sign up &amp; buy a package</h2>
     <p class="sub" id="enrollSub">Create your account, pay by bKash Send Money, submit the TrxID — admin approves and your package activates for 30 days.</p>
-    <div class="enroll-box">
+    <div class="enroll-box" id="enrollBox">
       <div id="enrollMsg"></div>
       <div id="signupStep">
         <form id="signupForm">
@@ -228,6 +257,8 @@ let selectedPackage = (new URLSearchParams(location.search)).get('package') || '
 const msg = document.getElementById('enrollMsg');
 function showErr(o){ msg.textContent = o.ok ? '' : (o.error || 'Failed'); }
 function fmt(n){ return n === null || n === undefined ? 'Unlimited' : n; }
+function qty(n, one, many){ return n === null || n === undefined ? 'Unlimited ' + many : n + ' ' + (n === 1 ? one : many); }
+function methodName(m){ return {bkash:'bKash',nagad:'Nagad',rocket:'Rocket',upay:'Upay'}[m] || m; }
 
 async function loadPricing(){
   const r = await fetch('/api/public/pricing');
@@ -267,6 +298,7 @@ function setEnrollTitle(t, s){
   document.getElementById('enrollSub').textContent = s;
 }
 function hideAllSteps(){
+  document.getElementById('enrollBox').classList.remove('wide');
   ['signupStep','planStep','payStep','pendingStep'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
@@ -278,18 +310,38 @@ function showSignupStep(){
 }
 function renderPlanOptions(){
   const pkgs = pricingData?.packages || [];
-  document.getElementById('planOptions').innerHTML = pkgs.map(p => `
-    <label style="display:block;border:2px solid ${p.id===selectedPackage?'#0D9488':'#ddd'};border-radius:10px;padding:12px;margin-bottom:10px;cursor:pointer">
-      <input type="radio" name="plan" value="${p.id}" ${p.id===selectedPackage?'checked':''} onchange="selectedPackage=this.value;renderPlanOptions();updatePayStep();">
-      <strong>${p.name}</strong> — ৳${p.priceBDT}/mo<br>
-      <span style="font-size:14px;color:#666">MFS numbers: ${fmt(p.numbers)} · Websites: ${fmt(p.websites)} · Verifications: ${fmt(p.verificationsPerMonth)} · ${p.methods.join(', ')}</span>
-    </label>`).join('');
+  // Fixed display order: Basic → Standard → Premium. The API returns the
+  // config's alphabetical order (basic, premium, standard) — do not rely
+  // on it for the layout.
+  const order = ['basic','standard','premium'];
+  const sorted = [...pkgs].sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
+  document.getElementById('planOptions').innerHTML = '<div class="plan-grid">' + sorted.map(p => {
+    const sel = p.id === selectedPackage;
+    const feat = p.id === 'premium';
+    const extra = [['Webhook', p.webhook], ['WooCommerce plugin', p.woocommerce], ['Priority support', p.prioritySupport]];
+    return `
+    <label class="plan-card${sel ? ' selected' : ''}${feat ? ' featured' : ''}">
+      <input type="radio" name="plan" value="${p.id}" ${sel ? 'checked' : ''} onchange="selectedPackage=this.value;renderPlanOptions();updatePayStep();">
+      ${feat ? '<span class="plan-ribbon">★ Most Popular</span>' : ''}
+      ${sel ? '<span class="plan-selected-badge">✓ Selected</span>' : ''}
+      <span class="plan-name">${p.name}</span>
+      <span class="plan-price">৳${p.priceBDT}<span class="plan-per">/mo</span></span>
+      <span class="plan-per-month">per month</span>
+      <span class="plan-divider"></span>
+      <span class="plan-feat">✓ ${qty(p.numbers, 'MFS number', 'MFS numbers')}</span>
+      <span class="plan-feat">✓ ${qty(p.websites, 'website', 'websites')}</span>
+      <span class="plan-feat">✓ ${qty(p.verificationsPerMonth, 'verification', 'verifications')}/mo</span>
+      <span class="plan-methods">${p.methods.map(m => `<span class="method-chip">${methodName(m)}</span>`).join('')}</span>
+      ${extra.map(([label, ok]) => `<span class="plan-feat${ok ? '' : ' off'}">${ok ? '✓' : '—'} ${label}</span>`).join('')}
+    </label>`;
+  }).join('') + '</div>';
 }
 function showPlanStep(){
   setEnrollTitle('Choose your plan', 'Step 2 of 3 — pick a package.');
   renderPlanOptions();
   hideAllSteps();
   document.getElementById('planStep').style.display = 'block';
+  document.getElementById('enrollBox').classList.add('wide');
 }
 function showPayStep(){
   updatePayStep();
