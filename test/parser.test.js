@@ -45,9 +45,12 @@ test('parser: Upay sender id is case-insensitive', () => {
   assert.equal(r.trxid, 'UPAYCASE12');
 });
 
-test('parser: unknown sender is unparseable', () => {
+test('parser: unknown sender still parses (method unknown, v2.8 consent path)', () => {
   const r = parseSms('You have received Tk 100.00 from 01711112222. TrxID: UNKNOWN123.', 'Unknown');
-  assert.equal(r.error, 'UNPARSEABLE');
+  assert.equal(r.error, undefined);
+  assert.equal(r.method, 'unknown');
+  assert.equal(r.trxid, 'UNKNOWN123');
+  assert.equal(r.amountPoisha, 10000);
 });
 
 test('parser: empty text is unparseable', () => {

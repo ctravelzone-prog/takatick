@@ -659,7 +659,7 @@ app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
   return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
 });
 
-// APK download (single source: android-app/TakaTickSMS-v1.3.apk).
+// APK download (single source: android-app/TakaTickSMS-v2.0.apk).
 // v2.2: active merchants only — a pending merchant must not get the app
 // before paying. The dashboard fetches it with its JWT (blob download).
 app.get('/download/app.apk', auth, (req, res) => {
@@ -667,9 +667,9 @@ app.get('/download/app.apk', auth, (req, res) => {
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   const blocked = merchantBlocked(merchant);
   if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
-  const apkPath = path.join(__dirname, 'android-app', 'TakaTickSMS-v1.3.apk');
+  const apkPath = path.join(__dirname, 'android-app', 'TakaTickSMS-v2.0.apk');
   if (!fs.existsSync(apkPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  return res.download(apkPath, 'TakaTickSMS-v1.3.apk');
+  return res.download(apkPath, 'TakaTickSMS-v2.0.apk');
 });
 
 // ---------- public routes ----------
@@ -996,6 +996,36 @@ app.post('/api/sms', (req, res) => {
      (merchant_id, trxid, method, sender, amount_poisha, received_at, raw_text, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'received', ?)`
   ).run(merchantId, parsed.trxid, parsed.method, parsed.senderNumber, parsed.amountPoisha, received, text, nowIso());
+  if (result.changes === 0) {
+    return res.json({ ok: true, duplicate: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
+  }
+  return res.json({ ok: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
+});
+
+// ---------- Paste an SMS (no-app fallback, v2.8) ----------
+// Merchant nijer messaging app theke payment SMS copy kore dashboard-e
+// paste korle server seta parse kore transaction hisebe rakhe — app,
+// permission, Play Protect — kichui lage na. Consent app-eo sender
+// thake na, tai parseSms ekhane sender null diye daka hoy.
+app.post('/api/me/sms-paste', auth, (req, res) => {
+  const { text } = req.body || {};
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ ok: false, error: 'INVALID_REQUEST' });
+  }
+  const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
+  const parsed = parseSms(text, null);
+  if (parsed.error) {
+    db.prepare(
+      'INSERT INTO sms_unparsed (merchant_id, sender, raw_text, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(merchant.id, null, text, parsed.reason || parsed.error, nowIso());
+    return res.status(422).json({ ok: false, error: 'UNPARSEABLE', reason: parsed.reason });
+  }
+  const result = db.prepare(
+    `INSERT OR IGNORE INTO sms_transactions
+     (merchant_id, trxid, method, sender, amount_poisha, received_at, raw_text, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'received', ?)`
+  ).run(merchant.id, parsed.trxid, parsed.method, parsed.senderNumber, parsed.amountPoisha, nowIso(), text, nowIso());
   if (result.changes === 0) {
     return res.json({ ok: true, duplicate: true, trxid: parsed.trxid, method: parsed.method, amount: toBdt(parsed.amountPoisha) });
   }

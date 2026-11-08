@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.takatick.sms"
-    android:versionCode="4"
-    android:versionName="1.3">
+    android:versionCode="5"
+    android:versionName="2.0">
 
-    <!-- SMS porte ar server-e pathate ei permission gulo lage.
-         READ_SMS BAD — app inbox pore na, SMS shudhu broadcast thekei
-         ney (SmsReceiver), tai READ_SMS lagbei na. Eta na thakle Play
-         Protect-er kache app-ta onek kom sondehojonok lage. -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <!-- v2.0: KONO SMS PERMISSION NEI. Payment SMS dhora hoy SMS User
+         Consent API (Google Play Services) diye — SMS asle Android nije
+         ekta dialog dekhay, merchant ekbar Allow chaplei oi SMS-ta
+         server-e jay. Tai Play Protect-er SMS block, "restricted
+         permission", "Allow restricted settings" — kichui lage na.
+         Sudhu INTERNET + foreground service (listener chalu rakhte) lage.
+         FOREGROUND_SERVICE* permission gulo normal (dangerous na). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
 
@@ -26,13 +31,18 @@
             </intent-filter>
         </activity>
 
-        <!-- System SMS broadcast shunbe. BROADCAST_SMS permission chara onno app fake SMS pathate parbe na. -->
+        <!-- Payment SMS-er jonno consent listener chalu rakhe. -->
+        <service
+            android:name=".SmsListenerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Phone restart hole listening abar chalu korbe. -->
         <receiver
-            android:name=".SmsReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>

@@ -52,7 +52,7 @@ code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere
 <div class="card" id="pkgBanner" style="border-left:5px solid #111"><h2>Your package</h2><div id="pkgStatus">Loading…</div></div>
 <div class="card"><h2>Profile &amp; package</h2><div id="profile">Loading…</div></div>
 <div class="card" id="dlCard"><h2>Downloads</h2>
-<div id="dlLinks" style="display:none"><p>📱 <a href="#" onclick="downloadFile('/download/app.apk','TakaTickSMS-v1.3.apk');return false">Download TakaTick SMS app (APK v1.3)</a> — install on the phone that receives payment SMS.<br><small>Play Protect block korle: Play Store → Play Protect → scanning OFF → install → abar ON.</small><br>
+<div id="dlLinks" style="display:none"><p>📱 <a href="#" onclick="downloadFile('/download/app.apk','TakaTickSMS-v2.0.apk');return false">Download TakaTick SMS app (APK v2.0)</a> — install on the phone that receives payment SMS.<br><small>Play Protect block korle: Play Store → Play Protect → scanning OFF → install → abar ON.</small><br>
 🛒 <a href="#" onclick="downloadFile('/downloads/takatick-woocommerce-plugin.zip','takatick-woocommerce-plugin.zip');return false">Download WooCommerce plugin (.zip)</a> — Premium only; setup guide in INTEGRATION.md.</p></div>
 <div id="dlLocked" style="display:none"><p>🔒 <strong>Locked</strong> — SMS app (APK) ar WooCommerce plugin download korte package active thakte hobe.</p></div></div>
 <div class="card"><h2>My package orders</h2><div id="orders">Loading…</div>
@@ -75,7 +75,9 @@ code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere
 <div class="card"><h2>Received SMS transactions</h2>
 <label>Method filter</label>
 <select id="txnFilter" onchange="renderTxns()"><option value="all">All methods</option><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="upay">Upay</option></select>
-<div id="txns"></div></div>
+<div id="txns"></div>
+<p><textarea id="pasteSms" rows="3" style="width:100%" placeholder="Payment SMS-ta ekhane paste koro (app chara verify korte)…"></textarea></p>
+<p><button onclick="pasteSms()">Add SMS</button> <span id="pasteMsg"></span></p></div>
 <div class="card"><h2>Verifications</h2><div id="verifs"></div></div>
 <script>
 const token = localStorage.getItem('token');
@@ -190,6 +192,15 @@ function renderTxns(){
   const rows = (window._txns||[]).filter(x => filter === 'all' || x.method === filter);
   document.getElementById('txns').innerHTML = '<table><tr><th>TrxID</th><th>Method</th><th>Amount</th><th>Sender</th><th>Status</th><th>Received</th></tr>'+
     rows.map(x=>`<tr><td>${esc(x.trxid)}</td><td>${esc(x.method)}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td>${esc(x.sender||'')}</td><td>${esc(x.status)}</td><td>${esc(x.received_at||'')}</td></tr>`).join('')+'</table>';
+}
+async function pasteSms(){
+  const text = (document.getElementById('pasteSms').value || '').trim();
+  if(!text){ document.getElementById('pasteMsg').textContent = 'SMS-ta paste koro'; return; }
+  const o = await api('/api/me/sms-paste', {method:'POST', body: JSON.stringify({text})});
+  document.getElementById('pasteMsg').textContent = o.ok
+    ? (o.duplicate ? 'Already added: ' + o.trxid : 'Added: ' + o.trxid + ' (' + o.method + ', ৳' + o.amount + ')')
+    : (o.error || 'Failed');
+  if(o.ok){ document.getElementById('pasteSms').value=''; load(); }
 }
 async function regenKey(){ const o = await api('/api/me/api-key/regenerate',{method:'POST',body:'{}'}); if(o.ok) alert('New API key: '+o.apiKey+'\nOld key revoked. Save it now.'); load(); }
 async function showApiKey(){ const o = await api('/api/me/api-key'); document.getElementById('apikey').textContent = o.ok ? ('API key: '+o.apiKey) : (o.error||'Failed'); }

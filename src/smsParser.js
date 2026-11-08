@@ -43,9 +43,6 @@ function parseSms(text, sender) {
   const raw = String(text || '');
   if (!raw.trim()) return { error: 'UNPARSEABLE', reason: 'empty SMS text' };
 
-  const method = detectMethod(sender, raw);
-  if (!method) return { error: 'UNPARSEABLE', reason: 'unknown sender/method' };
-
   const amountMatch = raw.match(AMOUNT_RE);
   if (!amountMatch) return { error: 'UNPARSEABLE', reason: 'amount not found' };
   const amountPoisha = Math.round(parseFloat(amountMatch[1].replace(/,/g, '')) * 100);
@@ -56,6 +53,11 @@ function parseSms(text, sender) {
   const trxMatch = raw.match(TRXID_RE);
   if (!trxMatch) return { error: 'UNPARSEABLE', reason: 'TrxID not found' };
   const trxid = trxMatch[1].trim();
+
+  // v2.8: method na bojha geleo (jemon Consent API-te sender thake na)
+  // amount + TrxID thik thakle SMS-ta rakha hoy — method 'unknown'.
+  // Verify TrxID + amount diyei hoy, method sudhu display/record-er jonno.
+  const method = detectMethod(sender, raw) || 'unknown';
 
   const senderMatch = raw.match(SENDER_NUMBER_RE);
   // Sender number is useful but not always present in every wording;

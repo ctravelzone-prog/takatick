@@ -1,74 +1,31 @@
 package com.takatick.sms;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-// NOTE: AndroidX use kora hoyni — Activity-er nijer requestPermissions /
-// checkSelfPermission (API 23+) use kora hoyeche, jate manual build-e
-// kono extra library na lage.
-
 /**
- * Setup screen: merchant server URL + appKey bosabe, permission dibe,
- * ar Test button diye ekta sample SMS server-e pathiye check korbe.
- * (UI code-e banano — kono layout XML file lage na.)
+ * Setup screen: merchant server URL + appKey bosabe, "SMS shona shuru
+ * korun" chaple listening chalu hobe, ar Test button diye ekta sample
+ * SMS server-e pathiye check korbe.
+ *
+ * v2.0 theke KONO SMS PERMISSION NEI — SMS User Consent API (Google Play
+ * Services) use hoy: payment SMS asle Android nije ekta dialog dekhay,
+ * merchant ekbar Allow chaplei oi SMS-ta server-e jay. Tai Play Protect
+ * block, restricted permission — kichui nei; install hoy sadharon app-er
+ * moto. (UI code-e banano — kono layout XML file lage na.)
  */
 public class MainActivity extends Activity {
 
     private EditText urlInput;
     private EditText keyInput;
     private TextView statusText;
-
-    private static final int REQ_SMS = 1001;
-
-    // SMS permission chaowa — sideload kora app-e Android 13+ SMS-ke
-    // "restricted permission" dhore: ekbar deny hole system ar Allow/Deny
-    // dialog dekhay na, "App was denied access" dekhay. Tokhon button
-    // chupchap kichu na kore boshe thakle cholbe na — App info khule
-    // "Allow restricted settings" ON korte hoy, tobei SMS Allow kora jay.
-    private void requestSmsPermission() {
-        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS)
-                == PackageManager.PERMISSION_GRANTED) {
-            statusText.setText("Status: SMS permission deoa ache ✅");
-            return;
-        }
-        boolean askedBefore = getSharedPreferences("takatick", MODE_PRIVATE)
-                .getBoolean("perm_asked", false);
-        if (askedBefore
-                && !shouldShowRequestPermissionRationale(Manifest.permission.RECEIVE_SMS)) {
-            // Restricted ba permanently denied — system dialog ar dibe na.
-            statusText.setText("Status: SMS permission restricted — Settings → Apps → TakaTick SMS → ⋮ → Allow restricted settings ON koro, tarpor SMS Allow koro");
-            Toast.makeText(this, "App info khulche — ⋮ theke Allow restricted settings ON koro", Toast.LENGTH_LONG).show();
-            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            i.setData(Uri.parse("package:" + getPackageName()));
-            startActivity(i);
-            return;
-        }
-        getSharedPreferences("takatick", MODE_PRIVATE).edit()
-                .putBoolean("perm_asked", true).apply();
-        requestPermissions(new String[]{Manifest.permission.RECEIVE_SMS}, REQ_SMS);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQ_SMS) return;
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            statusText.setText("Status: SMS permission deoa ache ✅");
-            Toast.makeText(this, "SMS permission deoa hoyeche ✅", Toast.LENGTH_SHORT).show();
-        } else {
-            statusText.setText("Status: SMS permission deoa hoy ni — abar chaple App info khulbe, okhane ⋮ → Allow restricted settings ON koro");
-        }
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,7 +40,7 @@ public class MainActivity extends Activity {
         title.setTextSize(22f);
 
         urlInput = new EditText(this);
-        urlInput.setHint("Server URL (jemon https://pay.apnar-domain.com)");
+        urlInput.setHint("Server URL (jemon https://takatick.onrender.com)");
 
         keyInput = new EditText(this);
         keyInput.setHint("App Key (dashboard theke)");
@@ -91,8 +48,11 @@ public class MainActivity extends Activity {
         Button saveBtn = new Button(this);
         saveBtn.setText("Save");
 
-        Button permBtn = new Button(this);
-        permBtn.setText("SMS permission din");
+        Button listenBtn = new Button(this);
+        listenBtn.setText("SMS shona shuru korun");
+
+        Button stopBtn = new Button(this);
+        stopBtn.setText("Shona bondho korun");
 
         Button testBtn = new Button(this);
         testBtn.setText("Test SMS pathan");
@@ -105,7 +65,8 @@ public class MainActivity extends Activity {
         urlInput.setText(saved[0]);
         keyInput.setText(saved[1]);
         if (!saved[0].isEmpty() && !saved[1].isEmpty()) {
-            statusText.setText("Status: setup kora ache");
+            statusText.setText("Status: setup kora ache — shunchi ✅");
+            startListening();
         }
 
         saveBtn.setOnClickListener(v -> {
@@ -117,7 +78,20 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Save hoyeche", Toast.LENGTH_SHORT).show();
         });
 
-        permBtn.setOnClickListener(v -> requestSmsPermission());
+        listenBtn.setOnClickListener(v -> {
+            String[] s = ApiClient.getSettings(this);
+            if (s[0].isEmpty() || s[1].isEmpty()) {
+                Toast.makeText(this, "Age Server URL ar App Key boshan", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            startListening();
+            statusText.setText("Status: payment SMS shunchi ✅ — SMS asle ekbar Allow chaplei hobe");
+        });
+
+        stopBtn.setOnClickListener(v -> {
+            stopService(new Intent(this, SmsListenerService.class));
+            statusText.setText("Status: shona bondho ache");
+        });
 
         testBtn.setOnClickListener(v -> {
             String[] settings = ApiClient.getSettings(this);
@@ -143,12 +117,16 @@ public class MainActivity extends Activity {
         layout.addView(urlInput);
         layout.addView(keyInput);
         layout.addView(saveBtn);
-        layout.addView(permBtn);
+        layout.addView(listenBtn);
+        layout.addView(stopBtn);
         layout.addView(testBtn);
         layout.addView(statusText);
         setContentView(layout);
+    }
 
-        // Kholar somoy permission na thakle chaowa.
-        requestSmsPermission();
+    private void startListening() {
+        Intent svc = new Intent(this, SmsListenerService.class);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc);
+        else startService(svc);
     }
 }

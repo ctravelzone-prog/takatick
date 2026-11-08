@@ -423,10 +423,10 @@ test('v2.2: keys + downloads locked until activation, issued on approve', async 
   assert.ok(apiKey.json.apiKey.startsWith('sk_live_'));
   // Downloads now work.
   assert.equal((await req('/download/app.apk', { token })).status, 200);
-  // v2.7.1: the served APK is v1.3 (release-signed, restricted-permission guide).
+  // v2.7.1: the served APK is v2.0 (consent-based, no SMS permission).
   const dl = await fetch(base + '/download/app.apk', { headers: { Authorization: 'Bearer ' + token } });
   assert.equal(dl.status, 200);
-  assert.match(dl.headers.get('content-disposition') || '', /TakaTickSMS-v1.3.apk/);
+  assert.match(dl.headers.get('content-disposition') || '', /TakaTickSMS-v2.0.apk/);
   assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip', { token })).status, 200);
 });
 
@@ -592,4 +592,44 @@ test('v2.7: admin can set a merchant expiry date (past = expired, future = activ
   assert.equal(noAdmin.status, 403);
   const gone = await req('/api/admin/merchants/999999/expiry', { method: 'POST', token: tok, body: { expiresAt: new Date().toISOString() } });
   assert.equal(gone.status, 404);
+});
+
+test('v2.8: paste an SMS from the dashboard (no app needed) + verify/confirm loop', async () => {
+  const m = await signup('Paste Merchant', 'paste-v28@example.com', 'basic');
+  // No token -> 401.
+  assert.equal((await req('/api/me/sms-paste', { method: 'POST', body: { text: 'x' } })).status, 401);
+  // No text -> 400.
+  assert.equal((await req('/api/me/sms-paste', { method: 'POST', token: m.token, body: {} })).status, 400);
+  // Garbage -> 422.
+  const bad = await req('/api/me/sms-paste', { method: 'POST', token: m.token, body: { text: 'hello world' } });
+  assert.equal(bad.status, 422);
+  assert.equal(bad.json.error, 'UNPARSEABLE');
+  // bKash SMS (method word in body) -> 200, method bkash.
+  const sms1 = 'You have received Tk 250.00 from 01711112222 via bKash. TrxID PASTE00001.';
+  const p1 = await req('/api/me/sms-paste', { method: 'POST', token: m.token, body: { text: sms1 } });
+  assert.equal(p1.status, 200, JSON.stringify(p1.json));
+  assert.equal(p1.json.ok, true);
+  assert.equal(p1.json.trxid, 'PASTE00001');
+  assert.equal(p1.json.method, 'bkash');
+  assert.equal(p1.json.amount, 250);
+  // Same SMS again -> duplicate.
+  const dup = await req('/api/me/sms-paste', { method: 'POST', token: m.token, body: { text: sms1 } });
+  assert.equal(dup.json.duplicate, true);
+  // No method word anywhere -> still parses, method 'unknown' (consent path).
+  const sms2 = 'You have received Tk 100.00 from 01711112222. TrxID PASTE00002.';
+  const p2 = await req('/api/me/sms-paste', { method: 'POST', token: m.token, body: { text: sms2 } });
+  assert.equal(p2.status, 200, JSON.stringify(p2.json));
+  assert.equal(p2.json.method, 'unknown');
+  // Full loop: verify + confirm on the pasted SMS.
+  const verify = await req('/api/v1/verify', {
+    method: 'POST',
+    body: { apiKey: m.apiKey, amount: 250, transactionId: 'PASTE00001', order_id: 'ORD-PASTE' },
+  });
+  assert.equal(verify.json.ok, true, JSON.stringify(verify.json));
+  assert.equal(verify.json.method, 'bkash');
+  const confirm = await req('/api/v1/confirm', {
+    method: 'POST',
+    body: { apiKey: m.apiKey, amount: 250, transactionId: 'PASTE00001', id: verify.json.id },
+  });
+  assert.equal(confirm.json.ok, true, JSON.stringify(confirm.json));
 });
