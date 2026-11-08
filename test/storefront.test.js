@@ -39,7 +39,7 @@ async function req(p, { method = 'GET', token, appKey, body, headers = {} } = {}
 async function signup(name, email, pkg) {
   const r = await req('/api/auth/signup', {
     method: 'POST',
-    body: { name, email, password: 'password123', package: pkg },
+    body: { name, email, phone: '01712345678', password: 'password123', package: pkg },
   });
   assert.equal(r.status, 201, `signup ${email}: ${JSON.stringify(r.json)}`);
   // v2.2: signup issues NO keys — they come only on activation.
@@ -776,4 +776,17 @@ test('v2.0 enroll is a separate page: landing has no wizard, Choose navigates to
   assert.equal(page.status, 200);
   assert.match(page.text, /id="enrollBox"/);
   assert.match(page.text, /01740707570/);
+});
+
+test('v2.4: signup asks phone number; admin shows it', async () => {
+  for (const p of ['/signup.html', '/enroll.html']) {
+    const page = await req(p);
+    assert.equal(page.status, 200, p);
+    assert.match(page.text, /name="phone"/);
+    assert.match(page.text, /Phone number/);
+  }
+  const admin = await req('/admin.html');
+  assert.match(admin.text, /<th>Phone<\/th>/);
+  assert.match(admin.text, /x\.phone/);
+  assert.match(admin.text, /href="tel:/);
 });

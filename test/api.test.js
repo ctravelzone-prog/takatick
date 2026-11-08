@@ -49,7 +49,7 @@ async function req(p, { method = 'GET', token, appKey, body, headers = {} } = {}
 async function signup(name, email, pkg) {
   const r = await req('/api/auth/signup', {
     method: 'POST',
-    body: { name, email, password: 'password123', package: pkg },
+    body: { name, email, phone: '01712345678', password: 'password123', package: pkg },
   });
   assert.equal(r.status, 201, `signup ${email}: ${JSON.stringify(r.json)}`);
   assert.equal(r.json.ok, true);
@@ -374,7 +374,7 @@ test('Upay pay-page claim confirms payment', async () => {
 test('v2.2: keys + downloads locked until activation, issued on approve', async () => {
   const r = await req('/api/auth/signup', {
     method: 'POST',
-    body: { name: 'Lock Test', email: 'lock@takatick.test', password: 'password123', package: 'basic' },
+    body: { name: 'Lock Test', email: 'lock@takatick.test', phone: '01712345678', password: 'password123', package: 'basic' },
   });
   assert.equal(r.status, 201, JSON.stringify(r.json));
   assert.ok(!('apiKey' in r.json) && !('appKey' in r.json) && !('payKey' in r.json));
@@ -441,7 +441,7 @@ test('v2.2.1: dashboard static HTML hides key buttons + download links by defaul
 test('v2.2.2: webhook secret gated until activation, masked in profile, revealed on demand', async () => {
   const r = await req('/api/auth/signup', {
     method: 'POST',
-    body: { name: 'Secret Test', email: 'secret@takatick.test', password: 'password123', package: 'basic' },
+    body: { name: 'Secret Test', email: 'secret@takatick.test', phone: '01712345678', password: 'password123', package: 'basic' },
   });
   assert.equal(r.status, 201, JSON.stringify(r.json));
   const login = await req('/api/auth/login', {
@@ -478,4 +478,35 @@ test('v2.2.2: webhook secret gated until activation, masked in profile, revealed
   // Dashboard offers the reveal button.
   const dash = await req('/dashboard.html');
   assert.match(dash.text, /Show webhook secret/);
+});
+
+test('v2.4: phone required at signup, stored, visible to admin', async () => {
+  // No phone -> 400.
+  const noPhone = await req('/api/auth/signup', {
+    method: 'POST',
+    body: { name: 'No Phone', email: 'nophone@takatick.test', password: 'password123', package: 'basic' },
+  });
+  assert.equal(noPhone.status, 400);
+  assert.equal(noPhone.json.error, 'INVALID_PHONE');
+  // Bad phone -> 400.
+  const badPhone = await req('/api/auth/signup', {
+    method: 'POST',
+    body: { name: 'Bad Phone', email: 'badphone@takatick.test', password: 'password123', phone: '12345', package: 'basic' },
+  });
+  assert.equal(badPhone.status, 400);
+  assert.equal(badPhone.json.error, 'INVALID_PHONE');
+  // Good phone -> stored on the merchant + visible in admin list/detail.
+  const ok = await req('/api/auth/signup', {
+    method: 'POST',
+    body: { name: 'Phone Test', email: 'phone@takatick.test', password: 'password123', phone: '01798765432', package: 'basic' },
+  });
+  assert.equal(ok.status, 201, JSON.stringify(ok.json));
+  assert.equal(ok.json.merchant.phone, '01798765432');
+  const tok = await adminToken();
+  const list = await req('/api/admin/merchants', { token: tok });
+  const row = list.json.merchants.find(m => m.email === 'phone@takatick.test');
+  assert.ok(row);
+  assert.equal(row.phone, '01798765432');
+  const detail = await req(`/api/admin/merchants/${row.id}`, { token: tok });
+  assert.equal(detail.json.merchant.phone, '01798765432');
 });

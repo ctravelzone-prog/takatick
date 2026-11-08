@@ -22,6 +22,7 @@ button{width:100%;padding:11px;border:0;border-radius:8px;background:#0D9488;col
 <form id="signupForm">
 <label>Name</label><input name="name" required>
 <label>Email</label><input name="email" type="email" required>
+<label>Phone number</label><input name="phone" type="tel" placeholder="01XXXXXXXXX" pattern="01[3-9][0-9]{8}" required>
 <label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
 <button type="submit">Create account</button>
 </form>
@@ -40,7 +41,7 @@ async function post(url, body){
 document.getElementById('signupForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const f = new FormData(e.target);
-  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password')});
+  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), phone: f.get('phone'), password: f.get('password')});
   if(o.ok){
     // v2.2: signup issues no keys — the account is pending until admin
     // approval. Log in and send the merchant to pick a package.

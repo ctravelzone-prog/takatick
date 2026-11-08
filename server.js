@@ -175,6 +175,7 @@ function publicMerchant(m) {
     id: m.id,
     name: m.name,
     email: m.email,
+    phone: m.phone || null,
     package: m.package,
     package_expires_at: m.package_expires_at || null,
     status: m.status || 'active',
@@ -411,6 +412,7 @@ function adminMerchantRow(m) {
     id: m.id,
     name: m.name,
     email: m.email,
+    phone: m.phone || null,
     package: m.package,
     status: m.status || 'active',
     package_expires_at: m.package_expires_at || null,
@@ -651,6 +653,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/api/auth/signup', (req, res) => {
   const { name, email, password } = req.body || {};
+  const phone = String(req.body?.phone || '').trim();
   const pkg = req.body?.package || 'basic';
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ ok: false, error: 'INVALID_NAME' });
@@ -660,6 +663,11 @@ app.post('/api/auth/signup', (req, res) => {
   }
   if (!password || String(password).length < 8) {
     return res.status(400).json({ ok: false, error: 'PASSWORD_TOO_SHORT' });
+  }
+  // v2.4: phone is required — Siam contacts clients on it when there is a
+  // problem, and it shows on the admin dashboard.
+  if (!/^01[3-9]\d{8}$/.test(phone)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_PHONE' });
   }
   if (!config.packages[pkg]) {
     return res.status(400).json({ ok: false, error: 'INVALID_PACKAGE' });
@@ -684,9 +692,9 @@ app.post('/api/auth/signup', (req, res) => {
   // 'active', and stay grandfathered.
   try {
     const info = db.prepare(
-      `INSERT INTO merchants (name, email, password_hash, package, package_expires_at, status, webhook_secret, pay_key, created_at)
-       VALUES (?, ?, ?, ?, NULL, 'pending', ?, ?, ?)`
-    ).run(name.trim(), String(email).toLowerCase(), passwordHash, pkg, webhookSecret, payKey, createdAt);
+      `INSERT INTO merchants (name, email, phone, password_hash, package, package_expires_at, status, webhook_secret, pay_key, created_at)
+       VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)`
+    ).run(name.trim(), String(email).toLowerCase(), phone, passwordHash, pkg, webhookSecret, payKey, createdAt);
     const merchantId = info.lastInsertRowid;
     const merchant = getMerchantById(merchantId);
     return res.status(201).json({

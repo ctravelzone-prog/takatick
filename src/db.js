@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS admins (
 for (const sql of [
   'ALTER TABLE merchants ADD COLUMN package_expires_at TEXT',
   "ALTER TABLE merchants ADD COLUMN status TEXT NOT NULL DEFAULT 'active'",
+  'ALTER TABLE merchants ADD COLUMN phone TEXT',
 ]) {
   try {
     db.exec(sql);

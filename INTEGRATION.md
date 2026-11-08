@@ -55,7 +55,7 @@ Package change kora jay dashboard theke. Limit sesh hole verify call `LIMIT_EXCE
 
 ## 3. Getting started (4 ta step)
 
-1. **Sign up korun dashboard-e** — naam, email, password ar package diye account khulun. Signup-er somoy apni ekbar-e paben: `apiKey`, `appKey`, `payKey`, `webhookSecret` — **egulo ekbar-i dekhano hoy, tai sathe sathe safe jaygay save kore rakhun.** Harale dashboard theke regenerate korte hobe.
+1. **Sign up korun** — naam, email, **phone number** ar password diye account khulun (phone lagbe — kono problem hole admin oi number-e contact korbe). Account approve howar por dashboard-er Keys card theke `apiKey`, `appKey`, `payKey`, `webhookSecret` paben.
 2. **Apnar number add korun (bKash, Nagad, Rocket, Upay)** — dashboard-er Numbers section-e apnar personal number (bKash, Nagad, Rocket ba Upay — je number-e taka asbe) add korun. Tier limit onujayi number add kora jabe (Basic: 1, Standard: 3, Premium: unlimited).
 3. **Android SMS app install korun** — je phone-e payment SMS ashe, oi phone-e TakaTick Android app install kore apnar `appKey` diye login korun. App-er source `android-app/` folder-e ache — Android Studio-te khule APK banan (oi folder-er README dekhun), ba dashboard-er Downloads section theke toiri APK-ta naman (`/download/app.apk`). App na thakle kono SMS server-e jabe na, ar verify kaj korbe na.
 4. **API key copy korun** — dashboard theke `apiKey` copy kore apnar website-er server-side code-e boshan. **API key kokhono browser-er JavaScript-e ba public jaygay rakhben na** — shudhu server-side.

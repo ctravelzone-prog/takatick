@@ -95,6 +95,7 @@ label{font-size:14px;font-weight:600}
         <form id="signupForm">
           <label>Name</label><input name="name" required>
           <label>Email</label><input name="email" type="email" required>
+          <label>Phone number</label><input name="phone" type="tel" placeholder="01XXXXXXXXX" pattern="01[3-9][0-9]{8}" required>
           <label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
           <p style="font-size:14px;color:#666">Selected plan: <strong id="signupPlan"></strong> — you can change it in the next step.</p>
           <button class="btn" type="submit" style="width:100%">Create account</button>
@@ -228,7 +229,7 @@ async function post(url, body, token){
 document.getElementById('signupForm').addEventListener('submit', async e => {
   e.preventDefault();
   const f = new FormData(e.target);
-  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: selectedPackage});
+  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), phone: f.get('phone'), password: f.get('password'), package: selectedPackage});
   if(!o.ok){ showErr(o); return; }
   const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
   if(!login.ok){ msg.textContent = 'Account created. Please log in.'; return; }

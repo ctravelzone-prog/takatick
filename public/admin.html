@@ -216,11 +216,11 @@ function renderMerchants(){
   const pf = document.getElementById('mPkgFilter').value;
   const sf = document.getElementById('mStatusFilter').value;
   const rows = cache.merchants.filter(x =>
-    (!q || x.name.toLowerCase().includes(q) || x.email.toLowerCase().includes(q)) &&
+    (!q || x.name.toLowerCase().includes(q) || x.email.toLowerCase().includes(q) || (x.phone || '').includes(q)) &&
     (!pf || x.package === pf) && (!sf || x.status === sf));
   document.getElementById('merchants').innerHTML = rows.length
-    ? '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Status</th><th>Expires</th><th>State</th><th>Usage/mo</th><th>Joined</th></tr>' +
-      rows.map(x => `<tr class="clickable" onclick="loadMerchantDetail(${x.id})"><td>${x.id}</td><td><strong>${esc(x.name)}</strong><br><small>${esc(x.email)}</small></td><td>${esc(x.package)}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.package_expires_at)}${x.days_left !== null && x.expiry_state !== 'no-expiry' ? `<br><small>${x.expiry_state === 'grace' ? x.grace_days_left + ' grace day(s) left' : x.days_left + ' day(s) left'}</small>` : ''}</td><td><span class="pill ${esc(x.expiry_state)}">${esc(x.expiry_state)}</span></td><td>${x.verifications_used_this_month} / ${x.verifications_limit ?? '∞'}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('') + '</table>'
+    ? '<table><tr><th>ID</th><th>Merchant</th><th>Phone</th><th>Package</th><th>Status</th><th>Expires</th><th>State</th><th>Usage/mo</th><th>Joined</th></tr>' +
+      rows.map(x => `<tr class="clickable" onclick="loadMerchantDetail(${x.id})"><td>${x.id}</td><td><strong>${esc(x.name)}</strong><br><small>${esc(x.email)}</small></td><td>${x.phone ? `<a href="tel:${esc(x.phone)}">${esc(x.phone)}</a>` : '—'}</td><td>${esc(x.package)}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.package_expires_at)}${x.days_left !== null && x.expiry_state !== 'no-expiry' ? `<br><small>${x.expiry_state === 'grace' ? x.grace_days_left + ' grace day(s) left' : x.days_left + ' day(s) left'}</small>` : ''}</td><td><span class="pill ${esc(x.expiry_state)}">${esc(x.expiry_state)}</span></td><td>${x.verifications_used_this_month} / ${x.verifications_limit ?? '∞'}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('') + '</table>'
     : '<p class="muted">No merchants match.</p>';
 }
 async function loadMerchantDetail(id){
@@ -231,7 +231,8 @@ async function loadMerchantDetail(id){
   const el = document.getElementById('merchantDetail');
   el.style.display = '';
   el.innerHTML = `<h3>${esc(m.name)} — ${esc(m.email)}</h3>
-    <p>Plan: <strong>${esc(m.package)}</strong> · Plan status: <span class="pill ${esc(m.status)}">${esc(m.status)}</span> · State: <span class="pill ${esc(m.expiry_state)}">${esc(m.expiry_state)}</span><br>
+    <p>Phone: ${m.phone ? `<a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>` : '—'}<br>
+    Plan: <strong>${esc(m.package)}</strong> · Plan status: <span class="pill ${esc(m.status)}">${esc(m.status)}</span> · State: <span class="pill ${esc(m.expiry_state)}">${esc(m.expiry_state)}</span><br>
     Expires: ${fmtDate(m.package_expires_at)} · Verifications this month: ${d.verificationsUsedThisMonth} / ${m.verifications_limit ?? '∞'} · API key: <code>${esc(d.apiKeyMasked || '—')}</code><br>
     Websites: ${(d.websites || []).map(esc).join(', ') || '—'}</p>
     <p><strong>Numbers:</strong> ${(d.numbers || []).map(x => esc(x.method) + ' ' + esc(x.number)).join(', ') || '—'}</p>
