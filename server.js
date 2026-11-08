@@ -154,6 +154,26 @@ app.get('/downloads/takatick-webhook-route.ts', auth, (req, res) => {
   return res.download(filePath, 'takatick-webhook-route.ts');
 });
 
+// Plug-and-play kit zips (Next.js + PHP): same gating as the plugin zip.
+app.get('/downloads/takatick-nextjs-kit.zip', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const zipPath = path.join(__dirname, 'public', 'downloads', 'takatick-nextjs-kit.zip');
+  if (!fs.existsSync(zipPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.download(zipPath, 'takatick-nextjs-kit.zip');
+});
+app.get('/downloads/takatick-php-kit.zip', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const zipPath = path.join(__dirname, 'public', 'downloads', 'takatick-php-kit.zip');
+  if (!fs.existsSync(zipPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.download(zipPath, 'takatick-php-kit.zip');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------
