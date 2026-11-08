@@ -790,3 +790,38 @@ test('v2.4: signup asks phone number; admin shows it', async () => {
   assert.match(admin.text, /x\.phone/);
   assert.match(admin.text, /href="tel:/);
 });
+
+test('v2.5: expired merchant cannot change numbers/settings or regenerate keys, but renewal stays open', async () => {
+  // The shared expiry fixture was moved back to grace (1 day past expiry)
+  // by later tests — force it to fully expired (4 days past) again.
+  const { db } = require('../server');
+  const fourDaysAgo = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
+  db.prepare('UPDATE merchants SET package_expires_at = ? WHERE id = ?')
+    .run(fourDaysAgo, expiryMerchant.merchant.id);
+  const prof = await req('/api/me/profile', { token: expiryMerchant.token });
+  assert.equal(prof.json.expiryState, 'expired');
+  const t = expiryMerchant.token;
+  const num = await req('/api/me/numbers', { method: 'POST', token: t, body: { method: 'bkash', number: '01711111111', label: 'Test' } });
+  assert.equal(num.status, 403);
+  assert.equal(num.json.error, 'PACKAGE_EXPIRED');
+  const st = await req('/api/me/settings', { method: 'POST', token: t, body: { webhook_url: 'https://example.com/hook', success_url: '', fail_url: '' } });
+  assert.equal(st.status, 403);
+  assert.equal(st.json.error, 'PACKAGE_EXPIRED');
+  const rg = await req('/api/me/api-key/regenerate', { method: 'POST', token: t, body: {} });
+  assert.equal(rg.status, 403);
+  assert.equal(rg.json.error, 'PACKAGE_EXPIRED');
+  // Renewal stays open: ordering a new package is NOT blocked.
+  const order = await req('/api/me/orders', { method: 'POST', token: t, body: { package: 'basic', trxid: 'EXPIRE-RENEW-1', sender: '01712345678', amount: 300 } });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+});
+
+test('v2.5: dashboard warns 1 day before expiry + big expired box listing what stopped', async () => {
+  const d = await req('/dashboard.html');
+  assert.equal(d.status, 200);
+  assert.match(d.text, /kal sesh hobe/);
+  assert.match(d.text, /daysLeft <= 1/);
+  assert.match(d.text, /Package-er meyad sesh/);
+  assert.match(d.text, /kichui kaj korbe na/);
+  assert.match(d.text, /SMS asleo confirm hobe na/);
+  assert.match(d.text, /const frozen = planOff/);
+});

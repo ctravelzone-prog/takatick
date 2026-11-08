@@ -254,6 +254,13 @@ function blockIfPlanOff(merchant, res) {
     res.status(403).json({ ok: false, error: 'ACCOUNT_DEACTIVATED' });
     return true;
   }
+  // v2.5: expired merchants cannot change numbers/websites/settings or
+  // regenerate keys either — nothing works after expiry until renewal.
+  // (Grace is NOT blocked; pending keeps its existing behaviour.)
+  if (merchant && merchantBlocked(merchant)?.error === 'PACKAGE_EXPIRED') {
+    res.status(403).json({ ok: false, error: 'PACKAGE_EXPIRED' });
+    return true;
+  }
   return false;
 }
 

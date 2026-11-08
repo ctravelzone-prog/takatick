@@ -91,6 +91,9 @@ async function load(){
   if(!p.ok){ document.getElementById('msg').textContent = p.error || 'Session expired'; if(p.error==='UNAUTHORIZED') logout(); return; }
   const m = p.merchant;
   const planOff = p.expiryState === 'deactivated';
+  // v2.5: expired merchants see everything frozen, like deactivated ones —
+  // the forms below are disabled when `frozen` is true.
+  const frozen = planOff || p.expiryState === 'expired';
   document.getElementById('profile').innerHTML =
     `<p><strong>${esc(m.name)}</strong> — ${esc(m.email)}<br>Package: <strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo)${planOff ? ' — <span style="color:#b00;font-weight:700">Plan deactivated</span>' : ''}<br>`+
     `Methods: ${(p.package.methods||[]).join(', ')}<br>`+
@@ -99,7 +102,7 @@ async function load(){
   document.getElementById('statPackage').textContent = p.package.name;
   document.getElementById('statPackageSub').textContent = planOff ? 'Plan deactivated' : ('৳' + p.package.priceBDT + '/mo' + (p.expiryState === 'pending' ? ' · Waiting for approval' : ''));
   document.getElementById('statExpiry').textContent = planOff ? 'Deactivated' : (expDate || 'No expiry');
-  document.getElementById('statExpirySub').textContent = planOff ? '' : (p.daysLeft !== null && p.daysLeft !== undefined ? p.daysLeft + ' day(s) left' : (p.expiryState === 'grace' ? p.graceDaysLeft + ' grace day(s) left' : ''));
+  document.getElementById('statExpirySub').textContent = planOff ? '' : (p.expiryState === 'expired' ? 'Expired — renew koro' : (p.daysLeft !== null && p.daysLeft !== undefined ? p.daysLeft + ' day(s) left' : (p.expiryState === 'grace' ? p.graceDaysLeft + ' grace day(s) left' : '')));
   document.getElementById('statVerif').textContent = p.usage.verificationsUsedThisMonth + ' / ' + (p.usage.verificationsLimit ?? '∞');
   const o = await api('/api/me/orders');
   const pendingOrder = (o.orders||[]).find(x=>x.status==='pending');
@@ -113,13 +116,18 @@ async function load(){
     banner = `<div style="background:#fde8e8;border:1px solid #f0b4b4;border-radius:10px;padding:16px"><p style="color:#b00;font-weight:800;font-size:18px;margin:0 0 6px">⛔ Plan deactivated</p><p style="margin:0">Your <strong>${esc(p.package.name)}</strong> plan is deactivated by the admin — verification and payments are stopped. Number, website ar settings change kora bondho ache. Contact the admin to reactivate your plan.</p></div>`;
     document.getElementById('pkgBanner').style.borderLeftColor = '#b00';
   } else if(p.expiryState === 'expired'){
-    banner = `<p style="color:#b00;font-weight:700">Expired — Renew koro</p><p>Your package expired on ${esc(expDate)}. Verification is stopped until you renew. Your API keys and data are safe — renewal reuses the same keys.</p><button onclick="location.href='/#pricing'">Renew now</button>`;
+    banner = `<div style="background:#fde8e8;border:1px solid #f0b4b4;border-radius:10px;padding:16px"><p style="color:#b00;font-weight:800;font-size:18px;margin:0 0 6px">⛔ Package-er meyad sesh</p><p style="margin:0">Tomar <strong>${esc(p.package.name)}</strong> package ${esc(expDate)}-e sesh hoye geche. Ekhon <strong>verify, confirm, pay link, API key dekha, ar download — kichui kaj korbe na</strong>. SMS asleo confirm hobe na. Renew korlei abar cholbe — ager key-i thakbe, notun key lagbe na.</p></div><p><button onclick="location.href='/#pricing'">Renew now</button></p>`;
     document.getElementById('pkgBanner').style.borderLeftColor = '#b00';
   } else if(p.expiryState === 'grace'){
     banner = `<p style="color:#8a6d00;font-weight:700">Grace period — ${p.graceDaysLeft} din baki, renew koro</p><p>Your package expired on ${esc(expDate)}. Verification still works during the ${p.graceDays}-day grace period — renew now to keep it running.</p><button onclick="location.href='/#pricing'">Renew now</button>`;
     document.getElementById('pkgBanner').style.borderLeftColor = '#c9a227';
   } else if(expDate){
-    banner = `<p><strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo) — Active<br>Expires: <strong>${esc(expDate)}</strong> (${p.daysLeft} day(s) left)</p>`;
+    // v2.5: from 1 day before expiry, warn loudly — the merchant sees this
+    // automatically on login, before anything stops.
+    banner = (p.daysLeft !== null && p.daysLeft <= 1)
+      ? `<p style="color:#8a6d00;font-weight:700">⚠️ Tomar package kal sesh hobe — ${esc(expDate)}</p><p>Renew na korle kal theke verify, confirm, pay link — sob bondho hoye jabe. Ekhoni renew koro, tahole service bondho hobe na.</p><button onclick="location.href='/#pricing'">Renew now</button>`
+      : `<p><strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo) — Active<br>Expires: <strong>${esc(expDate)}</strong> (${p.daysLeft} day(s) left)</p>`;
+    if (p.daysLeft !== null && p.daysLeft <= 1) document.getElementById('pkgBanner').style.borderLeftColor = '#c9a227';
   } else {
     banner = `<p><strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo) — Active<br>No expiry date.</p>`;
   }
@@ -128,12 +136,16 @@ async function load(){
   // (never approved) has no keys yet — show a locked box instead of the
   // keys/links. (No active API key = never activated.)
   const keysLocked = !p.apiKeyMasked;
-  document.getElementById('dlLinks').style.display = keysLocked ? 'none' : '';
-  document.getElementById('dlLocked').style.display = keysLocked ? '' : 'none';
-  document.getElementById('keysBtns').style.display = keysLocked ? 'none' : '';
+  const expired = p.expiryState === 'expired';
+  document.getElementById('dlLinks').style.display = (keysLocked || expired) ? 'none' : '';
+  document.getElementById('dlLocked').style.display = (keysLocked || expired) ? '' : 'none';
+  document.getElementById('keysBtns').style.display = (keysLocked || expired) ? 'none' : '';
   if (keysLocked) {
     document.getElementById('keys').innerHTML =
       `<p>🔒 <strong>Locked</strong> — API key, app key ar pay link pabe jokhon admin tomar package approve korbe (payment-er pore).</p><button onclick="location.href='/#pricing'">Buy a package</button>`;
+  } else if (expired) {
+    document.getElementById('keys').innerHTML =
+      `<p>⛔ <strong>Expired</strong> — API key, app key, webhook secret ar pay link ekhon kaj korbe na. Renew korle ager key-i abar cholbe.</p><button onclick="location.href='/#pricing'">Renew now</button>`;
   } else {
     document.getElementById('keys').innerHTML =
       `<p>API key: <code>${esc(p.apiKeyMasked||'')}</code><br>App key: <code>${esc(p.appKeyMasked||'')}</code><br>Webhook secret: <code>${esc(p.webhookSecretMasked||'')}</code><br>`+
@@ -159,7 +171,7 @@ async function load(){
   document.getElementById('orders').innerHTML = orderRows
     ? '<table><tr><th>ID</th><th>Package</th><th>Amount</th><th>TrxID</th><th>Status</th><th>Created</th></tr>' + orderRows + '</table>'
     : '<p>No orders yet — buy or renew from the <a href="/#pricing">pricing page</a>.</p>';
-  if (planOff) {
+  if (frozen) {
     for (const id of ['numForm', 'siteForm', 'settingsForm']) {
       document.getElementById(id).querySelectorAll('input,select,button').forEach((el) => { el.disabled = true; });
     }
