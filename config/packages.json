@@ -1,1 +1,47 @@
-{"brand":"TakaTick","currency":"BDT","graceDays":3,"packages":{"basic":{"methods":["bkash","nagad"],"name":"Basic","numbers":1,"priceBDT":300,"verificationsPerMonth":500,"webhook":false,"websites":1},"premium":{"methods":["bkash","nagad","rocket","upay"],"name":"Premium","numbers":null,"priceBDT":900,"prioritySupport":true,"verificationsPerMonth":null,"webhook":true,"websites":null,"woocommerce":true},"standard":{"methods":["bkash","nagad"],"name":"Standard","numbers":3,"priceBDT":600,"verificationsPerMonth":2000,"webhook":true,"websites":3}}}
+{
+  "brand": "TakaTick",
+  "currency": "BDT",
+  "graceDays": 3,
+  "packages": {
+    "basic": {
+      "methods": [
+        "bkash",
+        "nagad"
+      ],
+      "name": "Basic",
+      "numbers": 1,
+      "priceBDT": 300,
+      "verificationsPerMonth": 500,
+      "webhook": false,
+      "websites": 1
+    },
+    "premium": {
+      "methods": [
+        "bkash",
+        "nagad",
+        "rocket",
+        "upay"
+      ],
+      "name": "Premium",
+      "numbers": null,
+      "priceBDT": 900,
+      "prioritySupport": true,
+      "verificationsPerMonth": null,
+      "webhook": true,
+      "websites": null,
+      "woocommerce": true
+    },
+    "standard": {
+      "methods": [
+        "bkash",
+        "nagad"
+      ],
+      "name": "Standard",
+      "numbers": 3,
+      "priceBDT": 600,
+      "verificationsPerMonth": 2000,
+      "webhook": true,
+      "websites": 3
+    }
+  }
+}

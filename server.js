@@ -365,7 +365,137 @@ function adminMerchantRow(m) {
 app.get('/api/admin/stats', adminAuth, (_req, res) => {
   const merchants = db.prepare('SELECT COUNT(*) AS c FROM merchants').get().c;
   const pending = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE status = 'pending'").get().c;
-  return res.json({ ok: true, stats: { merchants, pendingOrders: pending, graceDays: getGraceDays() } });
+  // Status counts straight from the merchants table (pending/active/deactivated).
+  const byStatus = { active: 0, pending: 0, deactivated: 0 };
+  for (const r of db.prepare('SELECT status, COUNT(*) AS c FROM merchants GROUP BY status').all()) {
+    byStatus[r.status] = r.c;
+  }
+  // Merchants per package (Basic/Standard/Premium).
+  const byPackage = {};
+  for (const r of db.prepare('SELECT package, COUNT(*) AS c FROM merchants GROUP BY package').all()) {
+    byPackage[r.package] = r.c;
+  }
+  // Expiry-state counts need the JS expiryState logic (grace/expiring-soon
+  // are computed from package_expires_at, not stored).
+  const byExpiryState = {};
+  for (const m of db.prepare('SELECT * FROM merchants').all()) {
+    const st = adminMerchantRow(m).expiry_state;
+    byExpiryState[st] = (byExpiryState[st] || 0) + 1;
+  }
+  const month = currentMonthPrefix();
+  const verificationsThisMonth = db.prepare(
+    'SELECT COUNT(*) AS c FROM verifications WHERE substr(created_at, 1, 7) = ?'
+  ).get(month).c;
+  // Approved revenue this month = sum of approved orders (package fees
+  // paid to Siam's bKash). In poisha in the DB; reported in ৳.
+  const revenuePoisha = db.prepare(
+    "SELECT COALESCE(SUM(amount_poisha), 0) AS s FROM orders WHERE status = 'approved' AND substr(created_at, 1, 7) = ?"
+  ).get(month).s;
+  return res.json({
+    ok: true,
+    stats: {
+      merchants,
+      pendingOrders: pending,
+      graceDays: getGraceDays(),
+      byStatus,
+      byPackage,
+      byExpiryState,
+      verificationsThisMonth,
+      revenueThisMonthBDT: revenuePoisha / 100,
+    },
+  });
+});
+
+app.get('/api/admin/merchants/:id', adminAuth, (req, res) => {
+  const merchant = getMerchantById(req.params.id);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const numbers = db.prepare('SELECT * FROM numbers WHERE merchant_id = ? ORDER BY id').all(merchant.id);
+  const orders = db.prepare('SELECT * FROM orders WHERE merchant_id = ? ORDER BY id DESC LIMIT 20').all(merchant.id);
+  const verifs = db.prepare('SELECT * FROM verifications WHERE merchant_id = ? ORDER BY id DESC LIMIT 20').all(merchant.id);
+  const apiRow = db.prepare('SELECT key FROM api_keys WHERE merchant_id = ? AND revoked = 0 ORDER BY id DESC LIMIT 1').get(merchant.id);
+  return res.json({
+    ok: true,
+    merchant: adminMerchantRow(merchant),
+    websites: getWebsites(merchant),
+    numbers,
+    orders,
+    verifications: verifs,
+    apiKeyMasked: maskKey(apiRow?.key),
+    verificationsUsedThisMonth: verificationsUsedThisMonth(merchant.id),
+  });
+});
+
+app.get('/api/admin/transactions', adminAuth, (_req, res) => {
+  const sms = db.prepare(
+    `SELECT s.*, m.name AS merchant_name, m.email AS merchant_email
+     FROM sms_transactions s JOIN merchants m ON m.id = s.merchant_id
+     ORDER BY s.id DESC LIMIT 100`
+  ).all();
+  const verifs = db.prepare(
+    `SELECT v.*, m.name AS merchant_name, m.email AS merchant_email
+     FROM verifications v JOIN merchants m ON m.id = v.merchant_id
+     ORDER BY v.id DESC LIMIT 100`
+  ).all();
+  return res.json({ ok: true, smsTransactions: sms, verifications: verifs });
+});
+
+// ---------- admin package editing (v1.8) ----------
+// Writes config/packages.json and reloads the in-memory config in place,
+// so the change applies without a restart. The config object is shared
+// (src/limits.js getConfig returns the same object every module holds),
+// so mutating it in place keeps every route on the new values.
+const CONFIG_PATH = path.join(__dirname, 'config', 'packages.json');
+function reloadConfig(newConfig) {
+  for (const k of Object.keys(config)) delete config[k];
+  Object.assign(config, newConfig);
+}
+app.post('/api/admin/packages/:id', adminAuth, (req, res) => {
+  const id = req.params.id;
+  const existing = config.packages[id];
+  if (!existing) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const b = req.body || {};
+  const next = { ...existing };
+  if (b.name !== undefined) {
+    if (typeof b.name !== 'string' || !b.name.trim()) return res.status(400).json({ ok: false, error: 'INVALID_NAME' });
+    next.name = b.name.trim();
+  }
+  if (b.priceBDT !== undefined) {
+    const n = Number(b.priceBDT);
+    if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) return res.status(400).json({ ok: false, error: 'INVALID_PRICE' });
+    next.priceBDT = n;
+  }
+  for (const field of ['numbers', 'websites', 'verificationsPerMonth']) {
+    if (b[field] !== undefined) {
+      if (b[field] === null) { next[field] = null; continue; }
+      const n = Number(b[field]);
+      if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) {
+        return res.status(400).json({ ok: false, error: 'INVALID_' + field.toUpperCase() });
+      }
+      next[field] = n;
+    }
+  }
+  if (b.methods !== undefined) {
+    if (!Array.isArray(b.methods) || b.methods.length === 0 || !b.methods.every((m) => ALL_METHODS.includes(m))) {
+      return res.status(400).json({ ok: false, error: 'INVALID_METHODS' });
+    }
+    next.methods = [...new Set(b.methods)];
+  }
+  for (const field of ['webhook', 'woocommerce', 'prioritySupport']) {
+    if (b[field] !== undefined) next[field] = !!b[field];
+  }
+  const newConfig = { ...config, packages: { ...config.packages, [id]: next } };
+  if (b.graceDays !== undefined) {
+    const n = Number(b.graceDays);
+    if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) return res.status(400).json({ ok: false, error: 'INVALID_GRACE_DAYS' });
+    newConfig.graceDays = n;
+  }
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(newConfig, null, 2) + '\n');
+  } catch (_e) {
+    return res.status(500).json({ ok: false, error: 'CONFIG_SAVE_FAILED' });
+  }
+  reloadConfig(newConfig);
+  return res.json({ ok: true, package: { id, ...next }, graceDays: getGraceDays() });
 });
 
 app.get('/api/admin/merchants', adminAuth, (_req, res) => {

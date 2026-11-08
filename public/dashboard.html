@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard — {{BRAND}}</title>
+<link rel="icon" type="image/png" href="/favicon.png">
 <style>
 body{font-family:system-ui,sans-serif;max-width:900px;margin:0 auto;padding:20px;background:#f7f7f7;color:#222}
 .card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px}
@@ -17,7 +18,7 @@ code{background:#eee;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
-<h1>{{BRAND}} — Merchant dashboard</h1>
+<h1 style="display:flex;align-items:center;gap:12px"><img src="/images/logo.png" alt="TakaTick logo" style="height:34px;width:auto"> Merchant dashboard</h1>
 <p><button onclick="logout()">Log out</button> <button onclick="location.href='/'">Website</button></p>
 <div id="msg"></div>
 <div class="card" id="pkgBanner" style="border-left:5px solid #111"><h2>Your package</h2><div id="pkgStatus">Loading…</div></div>

@@ -459,6 +459,146 @@ test('enroll is a stepped wizard: hidden until a plan is chosen', async () => {
   assert.match(home.text, /Step 3 of 3/);
 });
 
+test('v1.8 logo + hero + favicon: files exist and pages reference them', async () => {
+  const home = await req('/');
+  assert.match(home.text, /\/images\/logo\.png/);
+  assert.match(home.text, /\/images\/hero\.png/);
+  assert.match(home.text, /hero-grid/);
+  assert.match(home.text, /Space Grotesk/);
+  for (const p of ['/images/logo.png', '/images/hero.png', '/favicon.png', '/images/feature-sms.png']) {
+    const r = await req(p);
+    assert.equal(r.status, 200, `${p} status ${r.status}`);
+  }
+  for (const p of ['/login.html', '/dashboard.html', '/admin.html']) {
+    const r = await req(p);
+    assert.equal(r.status, 200, `${p} status ${r.status}`);
+    assert.match(r.text, /\/images\/logo\.png/, `${p} has the logo`);
+    assert.match(r.text, /\/favicon\.png/, `${p} has the favicon`);
+  }
+});
+
+test('v1.8 optimistic profile chip: setProfileChip sets the chip from signup data', async () => {
+  const home = await req('/');
+  assert.match(home.text, /function setProfileChip/);
+  assert.match(home.text, /setProfileChip\(f\.get\('name'\)/);
+  assert.match(home.text, /Waiting for approval/);
+  assert.match(home.text, /setProfileChip\(p\.merchant\.name, p\.package\.name, stateLabel\)/);
+});
+
+test('v1.8 master admin: extended stats (per-package, per-status, revenue, verifications)', async () => {
+  const s = await req('/api/admin/stats', { token: adminToken });
+  assert.equal(s.status, 200, JSON.stringify(s.json));
+  const st = s.json.stats;
+  assert.equal(st.merchants, 5);
+  assert.equal(st.byPackage.basic, 2);
+  assert.equal(st.byPackage.standard, 1);
+  assert.equal(st.byPackage.premium, 2);
+  assert.equal(st.byStatus.active, 4);
+  assert.equal(st.byStatus.pending, 1);
+  assert.equal(st.byStatus.deactivated, 0);
+  assert.equal(st.pendingOrders, 0);
+  assert.equal(st.verificationsThisMonth, 3);
+  assert.equal(st.revenueThisMonthBDT, 3000);
+  assert.equal(st.graceDays, 3);
+});
+
+let masterMerchant = null;
+
+test('v1.8 master admin: merchant detail endpoint', async () => {
+  masterMerchant = await signup('Master Merchant', 'master@takatick.test', 'basic');
+  const num = await req('/api/me/numbers', {
+    method: 'POST', token: masterMerchant.token,
+    body: { method: 'bkash', number: '01799998888' },
+  });
+  assert.equal(num.status, 201, JSON.stringify(num.json));
+  await activateMerchant(masterMerchant.token, 'basic', 'MASTER-ORDER-1');
+
+  const d = await req(`/api/admin/merchants/${masterMerchant.merchant.id}`, { token: adminToken });
+  assert.equal(d.status, 200, JSON.stringify(d.json));
+  assert.equal(d.json.merchant.email, 'master@takatick.test');
+  assert.equal(d.json.merchant.package, 'basic');
+  assert.equal(d.json.merchant.expiry_state, 'active');
+  assert.ok(d.json.numbers.some((n) => n.number === '01799998888'));
+  assert.ok(d.json.orders.some((o) => o.trxid === 'MASTER-ORDER-1' && o.status === 'approved'));
+  assert.equal(d.json.websites.length, 0);
+
+  const missing = await req('/api/admin/merchants/999999', { token: adminToken });
+  assert.equal(missing.status, 404);
+  const asMerchant = await req(`/api/admin/merchants/${masterMerchant.merchant.id}`, { token: masterMerchant.token });
+  assert.equal(asMerchant.status, 403);
+  assert.equal(asMerchant.json.error, 'FORBIDDEN');
+});
+
+test('v1.8 master admin: transactions endpoint lists SMS + verifications', async () => {
+  await req('/api/sms', {
+    method: 'POST', appKey: masterMerchant.appKey,
+    body: { sender: 'bKash', text: 'You have received Tk 500.00 from 01712345678. TrxID: MASTER0001. Thank you.' },
+  });
+  const verify = await req('/api/v1/verify', {
+    method: 'POST',
+    body: { apiKey: masterMerchant.apiKey, amount: 500, transactionId: 'MASTER0001' },
+  });
+  assert.equal(verify.json.ok, true, JSON.stringify(verify.json));
+
+  const t = await req('/api/admin/transactions', { token: adminToken });
+  assert.equal(t.status, 200, JSON.stringify(t.json));
+  const sms = t.json.smsTransactions.find((x) => x.trxid === 'MASTER0001');
+  assert.ok(sms, 'SMS transaction listed');
+  assert.equal(sms.merchant_email, 'master@takatick.test');
+  assert.equal(sms.method, 'bkash');
+  const v = t.json.verifications.find((x) => x.transaction_id === 'MASTER0001');
+  assert.ok(v, 'verification listed');
+  assert.equal(v.merchant_email, 'master@takatick.test');
+
+  const asMerchant = await req('/api/admin/transactions', { token: masterMerchant.token });
+  assert.equal(asMerchant.status, 403);
+});
+
+test('v1.8 master admin: package editing applies live + validates + restores', async () => {
+  const edit = await req('/api/admin/packages/standard', {
+    method: 'POST', token: adminToken, body: { priceBDT: 650 },
+  });
+  assert.equal(edit.status, 200, JSON.stringify(edit.json));
+  assert.equal(edit.json.package.priceBDT, 650);
+  try {
+    const pricing = await req('/api/public/pricing');
+    const std = pricing.json.packages.find((p) => p.id === 'standard');
+    assert.equal(std.priceBDT, 650, 'public pricing shows the new price immediately');
+
+    const badPrice = await req('/api/admin/packages/standard', {
+      method: 'POST', token: adminToken, body: { priceBDT: -5 },
+    });
+    assert.equal(badPrice.status, 400);
+    const badPkg = await req('/api/admin/packages/ultra', {
+      method: 'POST', token: adminToken, body: { priceBDT: 100 },
+    });
+    assert.equal(badPkg.status, 404);
+    const asMerchant = await req('/api/admin/packages/standard', {
+      method: 'POST', token: masterMerchant.token, body: { priceBDT: 700 },
+    });
+    assert.equal(asMerchant.status, 403);
+  } finally {
+    const restore = await req('/api/admin/packages/standard', {
+      method: 'POST', token: adminToken, body: { priceBDT: 600 },
+    });
+    assert.equal(restore.status, 200, JSON.stringify(restore.json));
+    const pricing = await req('/api/public/pricing');
+    assert.equal(pricing.json.packages.find((p) => p.id === 'standard').priceBDT, 600);
+  }
+});
+
+test('v1.8 master admin: admin.html has all sections', async () => {
+  const r = await req('/admin.html');
+  assert.equal(r.status, 200);
+  assert.match(r.text, /Master Admin/);
+  for (const sec of ['dashboard', 'merchants', 'orders', 'packages', 'transactions', 'settings']) {
+    assert.match(r.text, new RegExp(`id="sec-${sec}"`), `section ${sec} present`);
+  }
+  assert.match(r.text, /showSection\('merchants'\)/);
+  assert.match(r.text, /loadMerchantDetail/);
+  assert.match(r.text, /savePackage/);
+});
+
 test('admin login returns ADMIN_NOT_CONFIGURED when no admin exists', async () => {
   const { db } = require('../server');
   db.prepare('DELETE FROM admins').run();

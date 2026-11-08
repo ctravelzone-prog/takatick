@@ -3,44 +3,150 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — {{BRAND}}</title>
+<title>Master Admin — {{BRAND}}</title>
+<link rel="icon" type="image/png" href="/favicon.png">
 <style>
-body{font-family:system-ui,sans-serif;max-width:1000px;margin:0 auto;padding:20px;background:#f7f7f7;color:#222}
-.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px}
-input,select{padding:9px;margin:4px;border:1px solid #ccc;border-radius:8px}
-button{padding:9px 14px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
+:root{--navy:#0A1B2E;--teal:#0D9488;--teal-dark:#0B7C72;--ink:#16283C;--muted:#5B6B7A;--bg:#F4F8F8;--line:#E3EBEC;--amber:#F59E0B}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;margin:0;background:var(--bg);color:var(--ink)}
+h1,h2,h3{font-family:'Space Grotesk',system-ui,sans-serif;color:var(--navy)}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 10px rgba(10,27,46,.05);margin-bottom:16px}
+input,select{padding:9px;margin:4px;border:1px solid #CBD8DB;border-radius:8px;font-size:14px}
+input:focus,select:focus{outline:none;border-color:var(--teal)}
+button{padding:9px 14px;border:0;border-radius:8px;background:var(--teal);color:#fff;cursor:pointer;font-size:14px;font-weight:600}
+button:hover{background:var(--teal-dark)}
 button.danger{background:#b00}
-button.ok{background:#0a7d2e}
+button.ghost{background:#fff;color:var(--ink);border:1px solid #CBD8DB}
 table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{border-bottom:1px solid #eee;padding:6px;text-align:left;overflow-wrap:anywhere}
-code{background:#eee;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
+td,th{border-bottom:1px solid #eee;padding:7px;text-align:left;overflow-wrap:anywhere;vertical-align:top}
+th{color:var(--muted);font-size:13px}
+code{background:#eef2f3;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}
 #msg{color:#b00}
 .pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;background:#eee}
 .pill.pending{background:#ffe9a8}.pill.approved{background:#c9ecd4}.pill.rejected{background:#f6c9c9}
 .pill.expired{background:#f6c9c9}.pill.grace{background:#ffe9a8}.pill.expiring-soon{background:#ffe9a8}
 .pill.active{background:#c9ecd4}.pill.deactivated{background:#f6c9c9}.pill.no-expiry{background:#e2e2e2}
+.topbar{display:flex;align-items:center;gap:14px;background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;position:sticky;top:0;z-index:10}
+.topbar img{height:32px;width:auto}
+.topbar h1{font-size:20px;margin:0}
+.topbar .spacer{flex:1}
+.layout{display:flex;max-width:1200px;margin:0 auto}
+.sidebar{width:210px;flex-shrink:0;padding:20px 12px}
+.sidebar a{display:block;padding:10px 14px;border-radius:8px;color:#3D4E5E;text-decoration:none;font-weight:600;margin-bottom:4px;cursor:pointer}
+.sidebar a.active{background:var(--navy);color:#fff}
+.sidebar a:hover:not(.active){background:#E6F0F0}
+.main{flex:1;padding:20px;min-width:0}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+.stat .num{font-size:28px;font-weight:800;color:var(--navy);font-family:'Space Grotesk',system-ui,sans-serif}
+.stat .lbl{font-size:13px;color:var(--muted)}
+.stat.teal .num{color:var(--teal-dark)}
+.stat.amber .num{color:#B45309}
+.clickable{cursor:pointer}
+.clickable:hover{background:#F0F7F7}
+.loginwrap{max-width:420px;margin:60px auto;padding:0 20px}
+.muted{color:var(--muted);font-size:13px}
+.pkgform label{display:block;font-size:13px;font-weight:600;margin-top:10px}
+.pkgform input[type=text],.pkgform input[type=number]{width:100%}
+.pkgform .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:760px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%;display:flex;overflow-x:auto;padding:10px}
+  .sidebar a{white-space:nowrap;margin:0 4px 0 0}
+  .main{padding:12px}
+}
 </style>
 </head>
 <body>
-<h1>{{BRAND}} — Admin panel</h1>
-<p><a href="/">← Back to website</a></p>
-<div id="msg"></div>
+<div class="topbar">
+  <img src="/images/logo.png" alt="TakaTick logo">
+  <h1>Master Admin</h1>
+  <span class="spacer"></span>
+  <span id="adminEmail" class="muted"></span>
+  <button class="ghost" onclick="logout()">Log out</button>
+</div>
 
-<div class="card" id="loginCard">
-  <h2>Admin log in</h2>
-  <form id="loginForm">
-    <label>Email</label><input name="email" type="email" required style="width:100%">
-    <label>Password</label><input name="password" type="password" required style="width:100%">
-    <button type="submit">Log in</button>
-  </form>
-  <p style="color:#666;font-size:14px">Admin account is set from the server environment (ADMIN_EMAIL / ADMIN_PASSWORD). If it is not set up yet, login shows ADMIN_NOT_CONFIGURED.</p>
+<div id="msg" style="max-width:1200px;margin:0 auto;padding:10px 20px 0"></div>
+
+<div class="loginwrap" id="loginCard">
+  <div class="card">
+    <h2>Admin log in</h2>
+    <form id="loginForm">
+      <label>Email</label><input name="email" type="email" required style="width:100%">
+      <label>Password</label><input name="password" type="password" required style="width:100%">
+      <button type="submit" style="width:100%">Log in</button>
+    </form>
+    <p class="muted">Admin account is set from the server environment (ADMIN_EMAIL / ADMIN_PASSWORD). If it is not set up yet, login shows ADMIN_NOT_CONFIGURED.</p>
+  </div>
+  <p class="muted"><a href="/">← Back to website</a></p>
 </div>
 
 <div id="panel" style="display:none">
-  <p><button onclick="logout()">Log out</button></p>
-  <div class="card"><h2>Overview</h2><div id="stats">Loading…</div></div>
-  <div class="card"><h2>Orders (pending first)</h2><div id="orders">Loading…</div></div>
-  <div class="card"><h2>Merchants</h2><div id="merchants">Loading…</div></div>
+  <div class="layout">
+    <nav class="sidebar">
+      <a data-sec="dashboard" class="active" onclick="showSection('dashboard')">📊 Dashboard</a>
+      <a data-sec="merchants" onclick="showSection('merchants')">👥 Merchants</a>
+      <a data-sec="orders" onclick="showSection('orders')">🧾 Orders</a>
+      <a data-sec="packages" onclick="showSection('packages')">📦 Packages</a>
+      <a data-sec="transactions" onclick="showSection('transactions')">💳 Transactions</a>
+      <a data-sec="settings" onclick="showSection('settings')">⚙️ Settings</a>
+    </nav>
+    <div class="main">
+      <section id="sec-dashboard">
+        <h2>Overview</h2>
+        <div class="statgrid" id="statCards"><p>Loading…</p></div>
+        <div class="card"><h3>Merchants per package</h3><div id="pkgBreakdown">Loading…</div></div>
+        <div class="card"><h3>Merchants by status</h3><div id="stateBreakdown">Loading…</div></div>
+      </section>
+
+      <section id="sec-merchants" style="display:none">
+        <h2>Merchants</h2>
+        <div class="card">
+          <input id="mSearch" placeholder="Search name or email…" style="width:280px" oninput="renderMerchants()">
+          <select id="mPkgFilter" onchange="renderMerchants()">
+            <option value="">All packages</option><option value="basic">Basic</option>
+            <option value="standard">Standard</option><option value="premium">Premium</option>
+          </select>
+          <select id="mStatusFilter" onchange="renderMerchants()">
+            <option value="">All statuses</option><option value="active">Active</option>
+            <option value="pending">Pending</option><option value="deactivated">Deactivated</option>
+          </select>
+          <button class="ghost" onclick="loadMerchants()">Refresh</button>
+        </div>
+        <div class="card"><div id="merchants">Loading…</div></div>
+        <div class="card" id="merchantDetail" style="display:none"></div>
+      </section>
+
+      <section id="sec-orders" style="display:none">
+        <h2>Orders (pending first)</h2>
+        <div class="card"><div id="orders">Loading…</div></div>
+      </section>
+
+      <section id="sec-packages" style="display:none">
+        <h2>Packages</h2>
+        <p class="muted">Edit a package and save — the change applies immediately (no restart) and new orders use the new price/limits. Existing merchants keep their current package until you change it or they renew.</p>
+        <div id="packageForms">Loading…</div>
+        <div class="card"><h3>Grace period</h3>
+          <p class="muted">Days after expiry during which verification keeps working. Applies to all packages.</p>
+          <label>Grace days <input id="graceInput" type="number" min="0" style="width:90px"></label>
+          <button onclick="saveGrace()">Save grace days</button>
+        </div>
+      </section>
+
+      <section id="sec-transactions" style="display:none">
+        <h2>Transactions (latest 100)</h2>
+        <div class="card"><h3>Received SMS</h3><div id="txSms">Loading…</div></div>
+        <div class="card"><h3>Verifications</h3><div id="txVerifs">Loading…</div></div>
+      </section>
+
+      <section id="sec-settings" style="display:none">
+        <h2>Settings</h2>
+        <div class="card"><div id="settingsBody">Loading…</div>
+          <p class="muted">These values come from the server environment / config file — change them in the environment (Render dashboard) or config/packages.json, then redeploy. They are not editable from this panel.</p>
+        </div>
+      </section>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -58,31 +164,203 @@ function fmtDate(iso){
   return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ' ' +
     d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
 }
-async function load(){
+function fmtBDT(poisha){ return '৳' + (poisha / 100).toFixed(2); }
+let cache = { merchants: [], stats: null, pricing: null };
+
+function showSection(name){
+  document.querySelectorAll('.sidebar a').forEach(a => a.classList.toggle('active', a.dataset.sec === name));
+  ['dashboard','merchants','orders','packages','transactions','settings'].forEach(s => {
+    document.getElementById('sec-' + s).style.display = s === name ? '' : 'none';
+  });
+  if(name === 'dashboard') loadDashboard();
+  if(name === 'merchants') loadMerchants();
+  if(name === 'orders') loadOrders();
+  if(name === 'packages') loadPackages();
+  if(name === 'transactions') loadTransactions();
+  if(name === 'settings') loadSettings();
+}
+
+async function loadDashboard(){
   const s = await api('/api/admin/stats');
   if(!s.ok){ msg.textContent = s.error || 'Session expired'; if(s.error==='UNAUTHORIZED') logout(); return; }
-  document.getElementById('stats').innerHTML =
-    `<p>Merchants: <strong>${s.stats.merchants}</strong> &nbsp; Pending orders: <strong>${s.stats.pendingOrders}</strong> &nbsp; Grace period: <strong>${s.stats.graceDays} days</strong></p>`;
-  const o = await api('/api/admin/orders');
-  document.getElementById('orders').innerHTML = '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Amount</th><th>TrxID</th><th>Sender</th><th>Status</th><th>Created</th><th>Action</th></tr>' +
-    (o.orders||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.merchant_name)}<br><small>${esc(x.merchant_email)}</small></td><td>${esc(x.package)}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td><code>${esc(x.trxid)}</code></td><td>${esc(x.sender||'')}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.created_at)}</td><td>${x.status==='pending' ? `<button class="ok" onclick="decide(${x.id},'approve')">Approve</button> <button class="danger" onclick="decide(${x.id},'reject')">Reject</button>` : esc(x.decided_at||'')}</td></tr>`).join('') + '</table>';
-  const m = await api('/api/admin/merchants');
-  document.getElementById('merchants').innerHTML = '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Status</th><th>Expires</th><th>State</th><th>Usage/mo</th><th>Joined</th><th>Action</th></tr>' +
-    (m.merchants||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.name)}<br><small>${esc(x.email)}</small></td><td>${esc(x.package)}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.package_expires_at)}${x.days_left!==null && x.expiry_state!=='no-expiry' ? `<br><small>${x.expiry_state==='grace' ? x.grace_days_left+' grace day(s) left' : x.days_left+' day(s) left'}</small>` : ''}</td><td><span class="pill ${esc(x.expiry_state)}">${esc(x.expiry_state)}</span></td><td>${x.verifications_used_this_month} / ${x.verifications_limit ?? '∞'}</td><td>${fmtDate(x.created_at)}</td><td><select onchange="setPackage(${x.id}, this.value)"><option value="">Change package…</option><option value="basic">Basic</option><option value="standard">Standard</option><option value="premium">Premium</option></select><br><button class="${x.status==='active'?'danger':''}" onclick="setStatus(${x.id}, '${x.status==='active'?'deactivated':'active'}')">${x.status==='active'?'Deactivate':'Activate'}</button></td></tr>`).join('') + '</table>';
+  cache.stats = s.stats;
+  const st = s.stats;
+  const card = (num, lbl, cls='') => `<div class="stat ${cls}"><div class="num">${num}</div><div class="lbl">${lbl}</div></div>`;
+  document.getElementById('statCards').innerHTML =
+    card(st.merchants, 'Total merchants') +
+    card(st.byStatus.active ?? 0, 'Active', 'teal') +
+    card(st.byStatus.pending ?? 0, 'Pending approval', 'amber') +
+    card(st.byExpiryState.expired ?? 0, 'Expired') +
+    card(st.byStatus.deactivated ?? 0, 'Deactivated') +
+    card(st.pendingOrders, 'Pending orders', 'amber') +
+    card(st.verificationsThisMonth, 'Verifications this month') +
+    card('৳' + Number(st.revenueThisMonthBDT || 0).toFixed(2), 'Approved revenue this month', 'teal');
+  const p = await api('/api/public/pricing');
+  cache.pricing = p;
+  const rows = (p.packages || []).map(pkg =>
+    `<tr><td><strong>${esc(pkg.name)}</strong></td><td>৳${pkg.priceBDT}/mo</td><td>${st.byPackage[pkg.id] ?? 0} merchants</td><td>${pkg.numbers ?? '∞'} numbers · ${pkg.websites ?? '∞'} websites · ${pkg.verificationsPerMonth ?? '∞'} verifications/mo</td><td>${pkg.methods.join(', ')}</td></tr>`).join('');
+  document.getElementById('pkgBreakdown').innerHTML =
+    '<table><tr><th>Package</th><th>Price</th><th>Merchants</th><th>Limits</th><th>Methods</th></tr>' + rows + '</table>';
+  const states = Object.entries(st.byExpiryState || {}).map(([k, v]) => `<span class="pill ${esc(k)}">${esc(k)}: ${v}</span>`).join(' ');
+  document.getElementById('stateBreakdown').innerHTML = states || '<p class="muted">No merchants yet.</p>';
 }
+
+async function loadMerchants(){
+  const m = await api('/api/admin/merchants');
+  if(!m.ok){ msg.textContent = m.error || 'Failed'; return; }
+  cache.merchants = m.merchants || [];
+  renderMerchants();
+}
+function renderMerchants(){
+  const q = (document.getElementById('mSearch').value || '').toLowerCase();
+  const pf = document.getElementById('mPkgFilter').value;
+  const sf = document.getElementById('mStatusFilter').value;
+  const rows = cache.merchants.filter(x =>
+    (!q || x.name.toLowerCase().includes(q) || x.email.toLowerCase().includes(q)) &&
+    (!pf || x.package === pf) && (!sf || x.status === sf));
+  document.getElementById('merchants').innerHTML = rows.length
+    ? '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Status</th><th>Expires</th><th>State</th><th>Usage/mo</th><th>Joined</th></tr>' +
+      rows.map(x => `<tr class="clickable" onclick="loadMerchantDetail(${x.id})"><td>${x.id}</td><td><strong>${esc(x.name)}</strong><br><small>${esc(x.email)}</small></td><td>${esc(x.package)}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.package_expires_at)}${x.days_left !== null && x.expiry_state !== 'no-expiry' ? `<br><small>${x.expiry_state === 'grace' ? x.grace_days_left + ' grace day(s) left' : x.days_left + ' day(s) left'}</small>` : ''}</td><td><span class="pill ${esc(x.expiry_state)}">${esc(x.expiry_state)}</span></td><td>${x.verifications_used_this_month} / ${x.verifications_limit ?? '∞'}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('') + '</table>'
+    : '<p class="muted">No merchants match.</p>';
+}
+async function loadMerchantDetail(id){
+  window._detailId = id;
+  const d = await api('/api/admin/merchants/' + id);
+  if(!d.ok){ alert(d.error || 'Failed'); return; }
+  const m = d.merchant;
+  const el = document.getElementById('merchantDetail');
+  el.style.display = '';
+  el.innerHTML = `<h3>${esc(m.name)} — ${esc(m.email)}</h3>
+    <p>Package: <strong>${esc(m.package)}</strong> · Status: <span class="pill ${esc(m.status)}">${esc(m.status)}</span> · State: <span class="pill ${esc(m.expiry_state)}">${esc(m.expiry_state)}</span><br>
+    Expires: ${fmtDate(m.package_expires_at)} · Verifications this month: ${d.verificationsUsedThisMonth} / ${m.verifications_limit ?? '∞'} · API key: <code>${esc(d.apiKeyMasked || '—')}</code><br>
+    Websites: ${(d.websites || []).map(esc).join(', ') || '—'}</p>
+    <p><strong>Numbers:</strong> ${(d.numbers || []).map(x => esc(x.method) + ' ' + esc(x.number)).join(', ') || '—'}</p>
+    <p><strong>Recent orders:</strong></p>
+    ${(d.orders || []).map(x => `<p>#${x.id} ${esc(x.package)} ${fmtBDT(x.amount_poisha)} <span class="pill ${esc(x.status)}">${esc(x.status)}</span> <code>${esc(x.trxid)}</code> ${fmtDate(x.created_at)} ${x.status === 'pending' ? `<button class="ok" onclick="decide(${x.id},'approve')">Approve</button> <button class="danger" onclick="decide(${x.id},'reject')">Reject</button>` : ''}</p>`).join('') || '<p class="muted">No orders.</p>'}
+    <p>
+      <select id="detailPkg"><option value="">Change package…</option><option value="basic">Basic</option><option value="standard">Standard</option><option value="premium">Premium</option></select>
+      <button onclick="setPackage(${m.id}, document.getElementById('detailPkg').value)">Apply package</button>
+      <select id="detailStatus">
+        <option value="active" ${m.status === 'active' ? 'selected' : ''}>Active</option>
+        <option value="pending" ${m.status === 'pending' ? 'selected' : ''}>Pending</option>
+        <option value="deactivated" ${m.status === 'deactivated' ? 'selected' : ''}>Deactivated</option>
+      </select>
+      <button onclick="setStatus(${m.id}, document.getElementById('detailStatus').value)">Apply status</button>
+      <button class="ghost" onclick="document.getElementById('merchantDetail').style.display='none'">Close</button>
+    </p>`;
+  el.scrollIntoView({behavior:'smooth'});
+}
+
+async function loadOrders(){
+  const o = await api('/api/admin/orders');
+  if(!o.ok){ msg.textContent = o.error || 'Failed'; return; }
+  document.getElementById('orders').innerHTML = '<table><tr><th>ID</th><th>Merchant</th><th>Package</th><th>Amount</th><th>TrxID</th><th>Sender</th><th>Status</th><th>Created</th><th>Action</th></tr>' +
+    (o.orders || []).map(x => `<tr><td>${x.id}</td><td>${esc(x.merchant_name)}<br><small>${esc(x.merchant_email)}</small></td><td>${esc(x.package)}</td><td>${fmtBDT(x.amount_poisha)}</td><td><code>${esc(x.trxid)}</code></td><td>${esc(x.sender || '')}</td><td><span class="pill ${esc(x.status)}">${esc(x.status)}</span></td><td>${fmtDate(x.created_at)}</td><td>${x.status === 'pending' ? `<button class="ok" onclick="decide(${x.id},'approve')">Approve</button> <button class="danger" onclick="decide(${x.id},'reject')">Reject</button>` : esc(x.decided_at || '')}</td></tr>`).join('') + '</table>';
+}
+
+async function loadPackages(){
+  const p = await api('/api/public/pricing');
+  if(!p.ok){ msg.textContent = p.error || 'Failed'; return; }
+  cache.pricing = p;
+  const st = cache.stats || (await api('/api/admin/stats')).stats;
+  cache.stats = st;
+  document.getElementById('packageForms').innerHTML = (p.packages || []).map(pkg => `
+    <div class="card pkgform"><h3>${esc(pkg.name)} <span class="muted">— ${st.byPackage[pkg.id] ?? 0} merchants</span></h3>
+      <label>Name <input type="text" id="pkg-${pkg.id}-name" value="${esc(pkg.name)}"></label>
+      <div class="row">
+        <label>Price (৳/mo) <input type="number" id="pkg-${pkg.id}-price" min="0" value="${pkg.priceBDT}"></label>
+        <label>MFS numbers (blank = unlimited) <input type="text" id="pkg-${pkg.id}-numbers" value="${pkg.numbers ?? ''}" placeholder="Unlimited"></label>
+        <label>Websites (blank = unlimited) <input type="text" id="pkg-${pkg.id}-websites" value="${pkg.websites ?? ''}" placeholder="Unlimited"></label>
+        <label>Verifications/mo (blank = unlimited) <input type="text" id="pkg-${pkg.id}-verifs" value="${pkg.verificationsPerMonth ?? ''}" placeholder="Unlimited"></label>
+      </div>
+      <label>Methods</label>
+      ${['bkash','nagad','rocket','upay'].map(m => `<label style="display:inline-block;margin-right:12px;font-weight:400"><input type="checkbox" id="pkg-${pkg.id}-m-${m}" ${pkg.methods.includes(m) ? 'checked' : ''} style="width:auto"> ${m}</label>`).join('')}
+      <label style="display:block"><input type="checkbox" id="pkg-${pkg.id}-webhook" ${pkg.webhook ? 'checked' : ''} style="width:auto"> Webhook</label>
+      <label style="display:block"><input type="checkbox" id="pkg-${pkg.id}-woo" ${pkg.woocommerce ? 'checked' : ''} style="width:auto"> WooCommerce plugin</label>
+      <label style="display:block"><input type="checkbox" id="pkg-${pkg.id}-prio" ${pkg.prioritySupport ? 'checked' : ''} style="width:auto"> Priority support</label>
+      <p><button onclick="savePackage('${pkg.id}')">Save ${esc(pkg.name)}</button></p>
+    </div>`).join('');
+  document.getElementById('graceInput').value = p.graceDays;
+}
+function numOrNull(v){
+  const t = String(v ?? '').trim();
+  if(t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? Math.floor(n) : NaN;
+}
+async function savePackage(id){
+  const g = (x) => document.getElementById(x).value;
+  const c = (x) => document.getElementById(x).checked;
+  const body = {
+    name: g(`pkg-${id}-name`),
+    priceBDT: Number(g(`pkg-${id}-price`)),
+    numbers: numOrNull(g(`pkg-${id}-numbers`)),
+    websites: numOrNull(g(`pkg-${id}-websites`)),
+    verificationsPerMonth: numOrNull(g(`pkg-${id}-verifs`)),
+    methods: ['bkash','nagad','rocket','upay'].filter(m => c(`pkg-${id}-m-${m}`)),
+    webhook: c(`pkg-${id}-webhook`),
+    woocommerce: c(`pkg-${id}-woo`),
+    prioritySupport: c(`pkg-${id}-prio`),
+  };
+  const o = await api(`/api/admin/packages/${id}`, {method:'POST', body: JSON.stringify(body)});
+  if(!o.ok){ alert(o.error || 'Failed'); return; }
+  alert('Package saved — live now.');
+  loadPackages();
+}
+async function saveGrace(){
+  const n = Number(document.getElementById('graceInput').value);
+  const o = await api('/api/admin/packages/basic', {method:'POST', body: JSON.stringify({graceDays: n})});
+  if(!o.ok){ alert(o.error || 'Failed'); return; }
+  alert('Grace period saved — ' + o.graceDays + ' days.');
+  loadDashboard();
+}
+
+async function loadTransactions(){
+  const t = await api('/api/admin/transactions');
+  if(!t.ok){ msg.textContent = t.error || 'Failed'; return; }
+  document.getElementById('txSms').innerHTML = (t.smsTransactions || []).length
+    ? '<table><tr><th>ID</th><th>Merchant</th><th>TrxID</th><th>Method</th><th>Amount</th><th>Sender</th><th>Status</th><th>Received</th></tr>' +
+      t.smsTransactions.map(x => `<tr><td>${x.id}</td><td>${esc(x.merchant_name)}<br><small>${esc(x.merchant_email)}</small></td><td><code>${esc(x.trxid)}</code></td><td>${esc(x.method)}</td><td>${fmtBDT(x.amount_poisha)}</td><td>${esc(x.sender || '')}</td><td>${esc(x.status)}</td><td>${fmtDate(x.received_at || x.created_at)}</td></tr>`).join('') + '</table>'
+    : '<p class="muted">No SMS transactions yet.</p>';
+  document.getElementById('txVerifs').innerHTML = (t.verifications || []).length
+    ? '<table><tr><th>ID</th><th>Merchant</th><th>Order</th><th>Amount</th><th>TrxID</th><th>Status</th><th>Created</th></tr>' +
+      t.verifications.map(x => `<tr><td>${x.id}</td><td>${esc(x.merchant_name)}<br><small>${esc(x.merchant_email)}</small></td><td>${esc(x.order_id || '')}</td><td>${fmtBDT(x.amount_poisha)}</td><td><code>${esc(x.transaction_id)}</code></td><td>${esc(x.status)}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('') + '</table>'
+    : '<p class="muted">No verifications yet.</p>';
+}
+
+async function loadSettings(){
+  const p = await api('/api/public/pricing');
+  const st = cache.stats || (await api('/api/admin/stats')).stats;
+  cache.stats = st;
+  document.getElementById('settingsBody').innerHTML = `
+    <p>Brand: <strong>${esc(p.brand)}</strong><br>
+    Currency: <strong>BDT</strong><br>
+    Seller bKash number (enroll payments go here): <strong>${esc(p.sellerBkash)}</strong><br>
+    Grace period: <strong>${p.graceDays} days</strong> (editable in the Packages section)<br>
+    Packages: <strong>${(p.packages || []).map(x => esc(x.name) + ' ৳' + x.priceBDT + '/mo').join(' · ')}</strong></p>`;
+}
+
 async function decide(id, action){
   const o = await api(`/api/admin/orders/${id}/${action}`, {method:'POST', body:'{}'});
-  if(!o.ok) alert(o.error||'Failed'); load();
+  if(!o.ok) alert(o.error || 'Failed');
+  loadOrders(); loadDashboard();
+  const d = document.getElementById('merchantDetail');
+  if(d.style.display !== 'none' && window._detailId) loadMerchantDetail(window._detailId);
 }
 async function setPackage(id, pkg){
   if(!pkg) return;
   const o = await api(`/api/admin/merchants/${id}/package`, {method:'POST', body: JSON.stringify({package: pkg})});
-  if(!o.ok) alert(o.error||'Failed'); load();
+  if(!o.ok) alert(o.error || 'Failed');
+  loadMerchants(); loadDashboard();
+  if(window._detailId) loadMerchantDetail(window._detailId);
 }
 async function setStatus(id, status){
   const o = await api(`/api/admin/merchants/${id}/status`, {method:'POST', body: JSON.stringify({status})});
-  if(!o.ok) alert(o.error||'Failed'); load();
+  if(!o.ok) alert(o.error || 'Failed');
+  loadMerchants(); loadDashboard();
+  if(window._detailId) loadMerchantDetail(window._detailId);
 }
+
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const f = new FormData(e.target);
@@ -94,7 +372,8 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
 function showPanel(){
   document.getElementById('loginCard').style.display = 'none';
   document.getElementById('panel').style.display = 'block';
-  load();
+  document.getElementById('adminEmail').textContent = 'Master Admin';
+  loadDashboard();
 }
 if(token()) showPanel();
 </script>
