@@ -46,6 +46,9 @@ code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere
 .dl-btns button{margin-top:0}
 button.ghost{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
 button.ghost:hover{background:var(--teal-soft)}
+.mustread{background:var(--teal-soft);border:1px solid #BFE8E2;border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14px}
+.mustread ul{margin:8px 0 0;padding-left:20px}
+.mustread li{margin-bottom:4px}
 @media (max-width:640px){.top-in h1{font-size:17px}}
 </style>
 </head>
@@ -63,6 +66,14 @@ button.ghost:hover{background:var(--teal-soft)}
 <div class="card"><h2>Profile &amp; package</h2><div id="profile">Loading…</div></div>
 <div class="card" id="dlCard"><h2>Downloads</h2>
 <div id="dlLinks" style="display:none">
+<div class="mustread"><strong>⚠️ Must read — kon file kothay diben:</strong>
+<ul>
+<li>📱 <strong>SMS app:</strong> APK phone-e install korun (je phone-e payment SMS ase).</li>
+<li>🛒 <strong>WooCommerce:</strong> WordPress admin → Plugins → Add New → Upload Plugin → zip upload korun.</li>
+<li>⚡ <strong>Next.js:</strong> TakaTickPayButton.tsx → <code>components/</code> folder-e; takatick-webhook-route.ts → <code>app/api/takatick-webhook/route.ts</code> naam-e rakhun.</li>
+<li>🐘 <strong>PHP:</strong> 2-ta file-i site-er root folder-e (public_html / public/) rakhun.</li>
+</ul>
+Key bosanor jayga prottek file-er uporei lekha ache — pay key button/pay file-e, webhook secret webhook file-e.</div>
 <div class="dl-grid">
 <div class="dl-card"><div class="dl-icon">📱</div><h3>TakaTick SMS app</h3><p>APK v1.7 — install on the phone that receives payment SMS.</p><p class="muted"><small>Play Protect block korle: Play Store → Play Protect → scanning OFF → install → abar ON.</small></p><button onclick="downloadFile('/download/app.apk','TakaTickSMS-v1.7.apk')">⬇ Download APK</button></div>
 <div class="dl-card"><div class="dl-icon">🛒</div><h3>WooCommerce plugin</h3><p>WordPress + WooCommerce site-e TakaTick add korun. Premium only.</p><p class="muted"><small>Setup guide in INTEGRATION.md.</small></p><button onclick="downloadFile('/downloads/takatick-woocommerce-plugin.zip','takatick-woocommerce-plugin.zip')">⬇ Download plugin</button></div>

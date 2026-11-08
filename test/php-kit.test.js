@@ -65,14 +65,14 @@ test('PHP kit files exist with key placeholders and install instructions', () =>
   assert.ok(hook.includes("file_get_contents('php://input')"), 'webhook reads the raw body');
 });
 
-test('kit zips exist with exactly the 2 files each', () => {
+test('kit zips exist with the 2 files + README each', () => {
   for (const [zip, files] of [
-    ['takatick-nextjs-kit.zip', ['TakaTickPayButton.tsx', 'takatick-webhook-route.ts']],
-    ['takatick-php-kit.zip', ['takatick-pay.php', 'takatick-webhook.php']],
+    ['takatick-nextjs-kit.zip', ['TakaTickPayButton.tsx', 'takatick-webhook-route.ts', 'README.txt']],
+    ['takatick-php-kit.zip', ['takatick-pay.php', 'takatick-webhook.php', 'README.txt']],
   ]) {
     const listing = execSync(`unzip -l ${path.join(root, 'public', 'downloads', zip)}`, { encoding: 'utf8' });
     for (const f of files) assert.ok(listing.includes(f), `${zip} contains ${f}`);
-    assert.match(listing, /2 files/, `${zip} has exactly 2 files`);
+    assert.match(listing, /3 files/, `${zip} has exactly 3 files`);
   }
 });
 
@@ -80,6 +80,10 @@ test('dashboard links the kit zips and server serves them (auth-gated)', () => {
   const dash = fs.readFileSync(path.join(root, 'public', 'dashboard.html'), 'utf8');
   assert.ok(dash.includes("downloadFile('/downloads/takatick-nextjs-kit.zip'"), 'dashboard links Next.js kit zip');
   assert.ok(dash.includes("downloadFile('/downloads/takatick-php-kit.zip'"), 'dashboard links PHP kit zip');
+  assert.ok(dash.includes('Must read'), 'dashboard has the must-read box');
+  assert.ok(dash.includes('components/'), 'must-read says where the button goes');
+  assert.ok(dash.includes('app/api/takatick-webhook/route.ts'), 'must-read says where the webhook route goes');
+  assert.ok(dash.includes('public_html'), 'must-read says where the PHP files go');
 
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   assert.ok(server.includes("app.get('/downloads/takatick-nextjs-kit.zip'"), 'server has Next.js zip route');
