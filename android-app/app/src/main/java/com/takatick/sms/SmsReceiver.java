@@ -7,21 +7,21 @@ import android.provider.Telephony;
 import android.telephony.SmsMessage;
 import android.util.Log;
 
-import java.util.regex.Pattern;
-
 /**
  * Payment SMS dhore server-e forward kore.
  *
  * SCOPE (ichchakrito choto rakha): sudhu 4 MFS sender-er SMS forward hoy —
  * bKash (16247), Nagad (16167), Rocket (16216), Upay (16268).
  * v1.4 fallback: sender ochena holeo body-r BHASHA diye payment SMS
- * chena hoy — sender ID ja-i hok na keno. Payment pattern:
+ * chena hoy — sender ID ja-i hok na keno. Payment pattern (PaymentSms):
  * "received" + "Tk" + amount + "TrxID", ba bKash/Nagad/Rocket/Upay-er
- * naam thakleo payment hisebe dhora hoy. (Inbox pora hoy na — manifest
- * receiver protita SMS live-ei dhore, tai notun payment SMS sobsomoy
- * paoa jay; READ_SMS anle Play Protect block fire asbe.)
+ * naam thakleo payment hisebe dhora hoy.
  * Onno kono SMS (OTP, bank, personal) pora ba pathano hoy na.
  * SMS jay shudhu merchant-er nijer configure kora server-e (MainActivity-te bosano URL).
+ *
+ * Inbox safety net (InboxScanner): broadcast kono karone miss korle app
+ * khulle inbox scan kore miss kora payment SMS pathay — RECEIVE_SMS
+ * broadcast-i primary (instant) poth thakbe.
  */
 public class SmsReceiver extends BroadcastReceiver {
 
@@ -54,7 +54,7 @@ public class SmsReceiver extends BroadcastReceiver {
                         if (sender == null || body == null) {
                             continue;
                         }
-                        if (!isMfsSender(sender) && !looksLikePaymentSms(body)) {
+                        if (!isMfsSender(sender) && !PaymentSms.looksLikePaymentSms(body)) {
                             continue; // MFS SMS na, payment-er moto-o na — chupchap ignore.
                         }
                         if (!isMfsSender(sender)) {
@@ -81,24 +81,5 @@ public class SmsReceiver extends BroadcastReceiver {
             }
         }
         return false;
-    }
-
-    // v1.4: sender ochena holeo body-r bhasha diye payment SMS chena hoy.
-    // (bKash-er asol SMS-ei dekha geche — sender list-e na thakle ager
-    // version chupchap fele dito, tai server-e kichui jayni.)
-    // Payment pattern: "received" + "Tk" + amount (Tk 10.00) + "TrxID",
-    // ba bKash/Nagad/Rocket/Upay-er naam thakleo payment hisebe dhora hoy.
-    // Server-e parse na hole (TrxID/amount na thakle) 422 hoye
-    // sms_unparsed-e jabe — transaction banbe na, tai vul forward-eo khoti nei.
-    private boolean looksLikePaymentSms(String body) {
-        String b = body.toLowerCase();
-        if (b.contains("bkash") || b.contains("nagad")
-                || b.contains("rocket") || b.contains("upay")) {
-            return true;
-        }
-        if (!b.contains("received") || !b.contains("tk") || !b.contains("trxid")) {
-            return false;
-        }
-        return Pattern.compile("tk\\s*[\\d,]+\\.\\d{2}").matcher(b).find();
     }
 }

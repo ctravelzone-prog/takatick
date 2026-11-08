@@ -5,10 +5,17 @@
     android:versionName="1.4">
 
     <!-- SMS porte ar server-e pathate ei permission gulo lage.
-         READ_SMS BAD — app inbox pore na, SMS shudhu broadcast thekei
-         ney (SmsReceiver), tai READ_SMS lagbei na. Eta na thakle Play
-         Protect-er kache app-ta onek kom sondehojonok lage. -->
+         RECEIVE_SMS — live broadcast theke payment SMS dhora (primary,
+         instant poth). READ_SMS — inbox safety net: broadcast kono karone
+         miss korle app khulle inbox scan kore miss kora payment SMS pathano
+         hoy (shesh 7 din / 50-ta message, sudhu payment-pattern SMS).
+         Siam-er siddhanto (8 Nov): Play Protect off kore sideload-i
+         cholbe, tai fastest + most accurate-tai neoa hoyeche — READ_SMS
+         thakle Play Protect block fire asleo install-er somoy off kore
+         nilei hoy. Inbox kokhono purota pora/pathano hoy na — sudhu
+         payment-er moto SMS-i server-e jay. -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />

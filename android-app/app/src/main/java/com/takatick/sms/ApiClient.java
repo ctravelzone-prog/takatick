@@ -49,8 +49,14 @@ public class ApiClient {
      * harano noy, 2s pore abar pathano hoy. Duijon caller-i (SmsReceiver
      * ar Test button) background thread theke dake, tai sleep safe. */
     public static boolean postSmsTo(String baseUrl, String appKey, String sender, String text) {
+        return postSmsTo(baseUrl, appKey, sender, text, Instant.now().toString());
+    }
+
+    /** Inbox safety net-er jonno: SMS-er asol somoy (receivedAt) diye pathano. */
+    public static boolean postSmsTo(String baseUrl, String appKey, String sender, String text,
+                                    String receivedAt) {
         for (int attempt = 1; attempt <= 3; attempt++) {
-            if (postSmsOnce(baseUrl, appKey, sender, text)) {
+            if (postSmsOnce(baseUrl, appKey, sender, text, receivedAt)) {
                 return true;
             }
             if (attempt < 3) {
@@ -67,13 +73,14 @@ public class ApiClient {
     }
 
     /** Ekbar POST /api/sms — 2xx hole true. */
-    private static boolean postSmsOnce(String baseUrl, String appKey, String sender, String text) {
+    private static boolean postSmsOnce(String baseUrl, String appKey, String sender, String text,
+                                       String receivedAt) {
         HttpURLConnection conn = null;
         try {
             JSONObject payload = new JSONObject();
             payload.put("sender", sender);
             payload.put("text", text);
-            payload.put("receivedAt", Instant.now().toString());
+            payload.put("receivedAt", receivedAt);
             byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
 
             URL url = new URL(baseUrl + "/api/sms");

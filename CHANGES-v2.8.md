@@ -26,13 +26,24 @@ Duto sombhabbo karon:
   Rocket/Upay-er naam thakleo forward hoy. Vul forward holeo khoti nei —
   server-e parse na hole 422 UNPARSEABLE hoye sms_unparsed-e jabe,
   transaction banbe na.
-- Inbox pora hoy NA (READ_SMS nei) — manifest receiver protita SMS
-  live-ei dhore, tai notun payment SMS sobsomoy paoa jay; inbox reading
-  anle Play Protect block fire asbe.
-- APK v1.4: versionCode 5, versionName 1.4, eki release keystore
+- Inbox safety net (v1.4, Siam-er siddhanto — fastest + most accurate,
+  Play Protect off kore sideload-i cholbe): `READ_SMS` jog kora hoyeche.
+  App khulle (ar Save-er por) inbox scan hoy — shesh 7 din + notun
+  50-ta message-er moddhe payment-pattern SMS (PaymentSms-er eki rule:
+  "received" + "Tk" + amount + "TrxID", ba MFS naam) khuje server-e
+  pathano hoy, asol somoy (receivedAt) soho. Agge pathano TrxID
+  SharedPreferences-e rakha hoy (server INSERT OR IGNORE diyeo dedup
+  kore, tai duplicate pathaleo khoti nei). Sudhu payment-er moto SMS-i
+  forward hoy — OTP/bank/personal SMS kokhono pora/pathano hoy na.
+  READ_SMS na thakle scan chupchap skip hoy. Broadcast receiver-i
+  primary (instant) poth thakbe — inbox sudhu miss kora SMS dhorar
+  safety net. MainActivity-te RECEIVE_SMS + READ_SMS ek sathe chaowa
+  hoy, status-e duitai dekhay.
+- APK v1.4: versionCode 5, versionName 1.4 (unshipped — inbox safety
+  net jog howar poro version ekoi), eki release keystore
   (signer CN=TakaTick, SHA-256 b2afc07e28f5e7c0194407b14eefb7ebb8178517df3ec993c11c96a95f3ce36c,
-  v2+v3), md5 `eeeee5557283b132053a79b1db307027`, 16,811 bytes.
-  Permissions: RECEIVE_SMS + INTERNET shudhu (aapt2 diye verify).
+  v2+v3), md5 `e76048edea7e085894f8394206cda47f`, 20,907 bytes.
+  Permissions: RECEIVE_SMS + READ_SMS + INTERNET (aapt2 diye verify).
 
 ## No-app fallback: dashboard-e SMS paste (v2.8 theke rakha)
 Merchant chaile app charai cholbe: messaging app theke payment SMS copy

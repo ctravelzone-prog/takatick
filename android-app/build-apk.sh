@@ -84,6 +84,8 @@ echo "== 3. javac (Java sources + R.java) =="
     "$APP_DIR/app/src/main/java/com/takatick/sms/MainActivity.java" \
     "$APP_DIR/app/src/main/java/com/takatick/sms/SmsReceiver.java" \
     "$APP_DIR/app/src/main/java/com/takatick/sms/ApiClient.java" \
+    "$APP_DIR/app/src/main/java/com/takatick/sms/PaymentSms.java" \
+    "$APP_DIR/app/src/main/java/com/takatick/sms/InboxScanner.java" \
     "$BUILD/classes/com/takatick/sms/R.java"
 
 echo "== 4. d8 (classes -> classes.dex) =="
