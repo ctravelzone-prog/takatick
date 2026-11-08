@@ -31,7 +31,7 @@ const PACKAGE_DAYS = 30;
 // Seller payment number (public — shown on the enroll/pricing page).
 // Siam's bKash number; SELLER_BKASH_NUMBER env overrides, the fallback
 // below is the same number (it is meant to be shown publicly).
-const SELLER_BKASH_NUMBER = process.env.SELLER_BKASH_NUMBER || '01740707570';
+const SELLER_BKASH_NUMBER = process.env.SELLER_BKASH_NUMBER || '01883042132';
 // Admin account: seeded from env on first boot (see ensureAdminSeeded).
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || null;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;

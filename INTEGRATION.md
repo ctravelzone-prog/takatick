@@ -39,7 +39,7 @@ Package change kora jay dashboard theke. Limit sesh hole verify call `LIMIT_EXCE
 
 **Kinben kivabe (buyer):**
 1. Website-er root page (`/`) theke package choose korun → signup (naam/email/password). **Signup-er por account `pending` thake — approve na howa porjonto verify/confirm ar pay page bondho; dashboard-e 'Waiting for approval' dekhabe.**
-2. **bKash Send Money** korun exact package amount — number: **01740707570** (page-e dekhano thake, copy button ache).
+2. **bKash Send Money** korun exact package amount — number: **01883042132** (page-e dekhano thake, copy button ache).
 3. TrxID + je number theke pay korechen (sender) form-e bosiye submit korun — order `pending` hobe.
 4. Admin manually check kore approve korle package **30 din-er jonno active** hobe — dashboard-e package + expiry date dekhte paben.
 

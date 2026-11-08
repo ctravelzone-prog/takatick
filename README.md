@@ -17,7 +17,7 @@ Puro integration guide: **[INTEGRATION.md](./INTEGRATION.md)** — website owner
 
 ## Website (landing page) + selling
 
-The root `/` is the TakaTick website: hero, features, how-it-works, pricing, FAQ and the enroll flow. A buyer picks a package, signs up, pays the monthly fee by bKash **Send Money to 01740707570** (SELLER_BKASH_NUMBER env, same number as the fallback default), submits the TrxID + sender number, and the order sits pending until the admin approves it. New signups are **pending** — verify/confirm and the hosted pay page return `403 PACKAGE_NOT_ACTIVE` until approval, and the dashboard shows a 'Waiting for approval' banner with the pending order. On approval the package activates for **30 days** (fresh from approval, never stacked).
+The root `/` is the TakaTick website: hero, features, how-it-works, pricing, FAQ and the enroll flow. A buyer picks a package, signs up, pays the monthly fee by bKash **Send Money to 01883042132** (SELLER_BKASH_NUMBER env, same number as the fallback default), submits the TrxID + sender number, and the order sits pending until the admin approves it. New signups are **pending** — verify/confirm and the hosted pay page return `403 PACKAGE_NOT_ACTIVE` until approval, and the dashboard shows a 'Waiting for approval' banner with the pending order. On approval the package activates for **30 days** (fresh from approval, never stacked).
 
 **Renewal + grace:** after the 30 days, the package gets a **3-day grace period** (`graceDays` in `config/packages.json`, changeable) — verify/confirm and the hosted pay page keep working, the dashboard shows a "Grace period — X din baki, renew koro" banner. After grace ends, verify/confirm return `403 PACKAGE_EXPIRED` and the pay page shows an expired notice. Renewal (new order → approve) sets a fresh 30 days from approval and reuses the same API keys — nothing is deleted on expiry. The dashboard shows the package, expiry date and grace/renew state prominently, with a Renew button.
 
@@ -80,7 +80,7 @@ Tarpor browser-e dashboard khulun (default `http://localhost:3000` — `PORT` en
 | `JWT_SECRET` | Login JWT sign korar secret — strong random value dite hobe |
 | `BRAND_NAME` | Brand naam — default `TakaTick` (Siam-er decide kora brand; ek jayga theke bodlano jay) |
 | `DB_PATH` | SQLite database file-er path |
-| `SELLER_BKASH_NUMBER` | Buyer-ra je bKash number-e Send Money korbe — Siam-er number `01740707570` (public, landing page-e dekhano hoy; env-e na dile ei number-tai fallback) |
+| `SELLER_BKASH_NUMBER` | Buyer-ra je bKash number-e Send Money korbe — Siam-er number `01883042132` (public, landing page-e dekhano hoy; env-e na dile ei number-tai fallback) |
 | `ADMIN_EMAIL` | Admin panel login email — first boot-e admin account banay |
 | `ADMIN_PASSWORD` | Admin panel login password — strong password dite hobe; na dile admin login bondho thakbe (`ADMIN_NOT_CONFIGURED`) |
 

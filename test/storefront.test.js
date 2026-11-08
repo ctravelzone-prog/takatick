@@ -16,7 +16,7 @@ let tmpDir;
 
 const ADMIN_EMAIL = 'admin@takatick.test';
 const ADMIN_PASSWORD = 'adminpass123';
-const SELLER_BKASH = '01740707570';
+const SELLER_BKASH = '01883042132';
 
 async function req(p, { method = 'GET', token, appKey, body, headers = {} } = {}) {
   const res = await fetch(base + p, {
@@ -779,7 +779,7 @@ test('v2.0 enroll is a separate page: landing has no wizard, Choose navigates to
   const page = await req('/enroll.html?plan=standard');
   assert.equal(page.status, 200);
   assert.match(page.text, /id="enrollBox"/);
-  assert.match(page.text, /01740707570/);
+  assert.match(page.text, /01883042132/);
 });
 
 test('v2.4: signup asks phone number; admin shows it', async () => {
