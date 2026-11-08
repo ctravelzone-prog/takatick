@@ -145,10 +145,15 @@ test('landing page at / : hero, features, pricing, FAQ; /pricing.html redirects;
   assert.match(r.text, /Log in/);
   assert.doesNotMatch(r.text, /\{\{BRAND\}\}|\{\{SELLER_BKASH\}\}/);
   // The seller bKash number moved with the wizard to the enroll page.
+  // v2.9.6: it is no longer baked into the enroll HTML — the payment step
+  // loads it from /api/public/pricing (sellerNumbers) at runtime.
   const enroll = await req('/enroll.html');
   assert.equal(enroll.status, 200);
-  assert.match(enroll.text, new RegExp(SELLER_BKASH));
+  assert.match(enroll.text, /sellerNumbers/);
   assert.doesNotMatch(enroll.text, /\{\{BRAND\}\}|\{\{SELLER_BKASH\}\}/);
+  const pricing = await req('/api/public/pricing');
+  assert.equal(pricing.status, 200);
+  assert.equal(pricing.json.sellerNumbers.bkash, SELLER_BKASH);
 
   const redir = await req('/pricing.html');
   assert.equal(redir.status, 302);
@@ -781,7 +786,7 @@ test('v2.0 enroll is a separate page: landing has no wizard, Choose navigates to
   const page = await req('/enroll.html?plan=standard');
   assert.equal(page.status, 200);
   assert.match(page.text, /id="enrollBox"/);
-  assert.match(page.text, /01883042132/);
+  assert.match(page.text, /sellerNumbers/); // v2.9.6: the number loads from pricing, not baked into the HTML
 });
 
 test('v2.4: signup asks phone number; admin shows it', async () => {
@@ -1043,4 +1048,7 @@ test('v2.9.3: enroll offers every seller method with a number (bKash/Nagad/Upay,
   assert.match(enroll.text, /selectPayMethod/);
   assert.match(enroll.text, /sellerNumbers/);
   assert.match(enroll.text, /\/mfs\//);
+  assert.match(enroll.text, /payMethodDetail/);
+  assert.match(enroll.text, /backToPayMethods/);
+  assert.match(enroll.text, /ট্রানজেকশন আইডি দিন/);
 });

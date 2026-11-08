@@ -339,16 +339,34 @@ test('Rocket flow: ingest -> verify -> confirm -> webhook', async () => {
   assert.equal(rocketRow.status, 'used');
 });
 
-test('pay page: Premium shows Rocket + Upay numbers grouped, brand TakaTick', async () => {
+test('pay page: Premium lists Rocket + Upay method cards only (no numbers yet)', async () => {
   const res = await fetch(`${base}/pay/${premium.payKey}?amount=750&order_id=ORD-R1`);
   const html = await res.text();
   assert.equal(res.status, 200);
   assert.match(html, /TakaTick/);
-  assert.match(html, /Rocket/);
+  assert.match(html, /Rocket SendMoney/);
+  assert.match(html, new RegExp(`/pay/${premium.payKey}/rocket`));
+  assert.match(html, /Upay SendMoney/);
+  assert.match(html, new RegExp(`/pay/${premium.payKey}/upay`));
+  assert.doesNotMatch(html, /\/mfs\/bkash\.png/);
+  assert.doesNotMatch(html, /01722223333/); // numbers live on the method page
+});
+
+test('v2.9.6: pay method page shows that method number + Bangla instructions + VERIFY', async () => {
+  const res = await fetch(`${base}/pay/${premium.payKey}/rocket?amount=750&order_id=ORD-R1`);
+  const html = await res.text();
+  assert.equal(res.status, 200);
   assert.match(html, /01722223333/);
-  assert.match(html, /Upay/);
-  assert.match(html, /01933334444/);
+  assert.match(html, /\*322#/);
+  assert.match(html, /ট্রানজেকশন আইডি দিন/);
+  assert.match(html, /VERIFY TRANSACTION/);
   assert.match(html, /name="method"/);
+  assert.match(html, /value="rocket"/);
+  assert.match(html, /name="transactionId"/);
+  assert.match(html, /#8c3494/); // Rocket brand colour
+  // Unregistered method -> 404.
+  const bad = await fetch(`${base}/pay/${premium.payKey}/bkash?amount=750`);
+  assert.equal(bad.status, 404);
 });
 
 test('Upay pay-page claim confirms payment', async () => {
@@ -652,16 +670,17 @@ test('v2.9.2: admin can edit the seller bKash number (DB overrides env)', async 
   }
   const still = await req('/api/admin/settings', { token: tok });
   assert.equal(still.json.sellerBkash, original);
-  // Valid change -> enroll page + pricing show the new number immediately.
+  // Valid change -> pricing shows the new number immediately (the enroll
+  // payment step loads it from pricing at runtime, v2.9.6 — it is no
+  // longer baked into the enroll HTML).
   const next = original === '01883042132' ? '01999112233' : '01883042132';
   const save = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerBkash: next } });
   assert.equal(save.status, 200, JSON.stringify(save.json));
   assert.equal(save.json.sellerBkash, next);
   assert.equal(save.json.sellerBkashSource, 'admin');
-  const enroll = await req('/enroll.html?plan=basic');
-  assert.match(enroll.text, new RegExp(next));
   const pricing = await req('/api/public/pricing');
   assert.equal(pricing.json.sellerBkash, next);
+  assert.equal(pricing.json.sellerNumbers.bkash, next);
   // Reset (empty) -> back to the env/default value.
   const reset = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerBkash: '' } });
   assert.equal(reset.status, 200, JSON.stringify(reset.json));
@@ -731,11 +750,13 @@ test('v2.9.5: JSON claim confirms payment (embed widget flow)', async () => {
   assert.match(bad.json.message, /Unknown TrxID/);
 });
 
-test('v2.9.4/5: embed widget + MFS logos are served', async () => {
+test('v2.9.4/5/6: embed widget + MFS logos are served, two-step flow', async () => {
   const js = await req('/takatick-embed.js');
   assert.equal(js.status, 200);
   assert.match(js.text, /takatick-checkout/);
   assert.match(js.text, /\/mfs\//);
+  assert.match(js.text, /renderDetail/);
+  assert.match(js.text, /VERIFY TRANSACTION/);
   for (const m of ['bkash', 'nagad', 'rocket', 'upay']) {
     const img = await fetch(`${base}/mfs/${m}.png`);
     assert.equal(img.status, 200, m);

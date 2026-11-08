@@ -67,6 +67,10 @@ label{font-size:14px;font-weight:600}
 .pay-method-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px}
 .pay-method-btn img{height:30px;max-width:90%;object-fit:contain}
 .pay-method-btn span{font-size:13px;font-weight:700}
+.pay-method-card{border:1px solid #e5e5e5;border-radius:16px;padding:22px 10px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:14px;color:#222;font-family:inherit}
+.pay-method-card img{height:44px;max-width:80%;object-fit:contain}
+.pay-method-card span{font-size:15px;font-weight:600;color:#333}
+.hl{color:#ffe600}
 .okbox{background:#e9f7ee;border:1px solid #7cc79a;border-radius:8px;padding:12px;font-size:15px}
 @media (max-width:760px){
   .nav a.link{display:none}
@@ -112,18 +116,27 @@ label{font-size:14px;font-weight:600}
         <p style="color:#666;font-size:14px">You can change the plan before paying — the payment step always uses the plan selected here.</p>
       </div>
       <div id="payStep" style="display:none">
-        <h3 style="margin-top:0" id="payMethodTitle">Pay by bKash Send Money</h3>
-        <div id="payMethods" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0"></div>
-        <p>Send exactly <strong id="payAmount"></strong> to this <span id="payMethodName">bKash</span> number (Send Money):</p>
-        <p><span class="paynum" id="payNumber">{{SELLER_BKASH}}</span>
-        <button type="button" class="btn outline" id="payCopyBtn" onclick="copyPayNumber()">Copy number</button></p>
-        <form id="orderForm">
-          <label>Package</label><input id="orderPackage" readonly>
-          <label>Amount (৳, exact)</label><input id="orderAmount" readonly>
-          <label id="trxidLabel">TrxID (from your bKash payment)</label><input name="trxid" required placeholder="e.g. 9AB12CD34E">
-          <label id="senderLabel">Your bKash number (the number you paid from)</label><input name="sender" required placeholder="01XXXXXXXXX">
-          <button class="btn" type="submit" style="width:100%">Submit TrxID</button>
-        </form>
+        <div id="payMethodList">
+          <h3 style="margin-top:0">Choose a payment method</h3>
+          <div id="payMethods" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:8px 0"></div>
+          <p style="color:#666;font-size:14px">Send exactly <strong id="payAmount"></strong> — tap a method to see the number.</p>
+        </div>
+        <div id="payMethodDetail" style="display:none">
+          <a href="#" onclick="backToPayMethods();return false" style="color:#333;font-weight:600;text-decoration:none">← Choose another method</a>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0">
+            <img id="payDetailLogo" src="" alt="" style="height:44px;max-width:45%;object-fit:contain">
+            <span id="payDetailAmount" style="font-size:22px;font-weight:800"></span>
+          </div>
+          <p style="background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px;text-align:center;color:#8a6d00">নোট: টাকা পাঠানোর ৫-১০ সেকেন্ড পর ভেরিফাই করবেন।</p>
+          <div id="payDetailPanel" style="border-radius:16px;padding:20px;color:#fff;margin:12px 0"></div>
+          <form id="orderForm">
+            <label>Package</label><input id="orderPackage" readonly>
+            <label>Amount (৳, exact)</label><input id="orderAmount" readonly>
+            <label id="trxidLabel">TrxID (from your bKash payment)</label><input name="trxid" required placeholder="ট্রানজেকশন আইডি দিন">
+            <label id="senderLabel">Your bKash number (the number you paid from)</label><input name="sender" required placeholder="01XXXXXXXXX">
+            <button class="btn" id="orderSubmitBtn" type="submit" style="width:100%">Submit TrxID</button>
+          </form>
+        </div>
       </div>
       <div id="pendingStep" style="display:none">
         <div class="okbox"><strong>Order submitted!</strong><br><span id="pendingText"></span></div>
@@ -181,32 +194,72 @@ function sellerMethods(){
   const methods = Object.keys(nums);
   return methods.length ? methods : ['bkash'];
 }
+// v2.9.6: ZiniPay-style two-step — method list, then a NEW brand-coloured
+// method page (Bangla instructions + the seller's number for that method).
+const MFS_BRAND = {
+  bkash: { label: 'bKash', ussd: '*247#', color: '#e2136e' },
+  nagad: { label: 'Nagad', ussd: '*167#', color: '#ed1c24' },
+  rocket: { label: 'Rocket', ussd: '*322#', color: '#8c3494' },
+  upay: { label: 'Upay', ussd: '*268#', color: '#111111' },
+};
+function mfsInstructionsHtml(m, number, amount){
+  const b = MFS_BRAND[m];
+  const amt = amount ? `পরিমাণ: <b class="hl">${amount} টাকা</b> দিয়ে <b class="hl">SUBMIT</b> করুন।`
+    : `পরিমাণ: আপনার অর্ডারের টাকা দিয়ে <b class="hl">SUBMIT</b> করুন।`;
+  const li = 'display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.25);font-size:14px;line-height:1.5';
+  return `<h2 style="text-align:center;margin:0 0 14px;font-size:20px">ট্রানজেকশন আইডি দিন</h2>
+  <h3 style="margin:14px 0 6px;font-size:14px;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.35);padding-bottom:8px">INSTRUCTIONS</h3>
+  <ul style="list-style:none;margin:0;padding:0">
+    <li style="${li}"><span><b class="hl">${b.ussd}</b> ডায়াল করে আপনার <b class="hl">${b.label.toUpperCase()}</b> মোবাইল মেনুতে যান অথবা <b class="hl">${b.label.toUpperCase()}</b> অ্যাপে যান।</span></li>
+    <li style="${li}"><span>"<b class="hl">Send Money</b>"-এ ক্লিক করুন।</span></li>
+    <li style="${li}"><span>প্রাপক নম্বর হিসেবে এই নম্বরটি লিখুন:</span></li>
+  </ul>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.25)">
+    <span style="font-size:22px;font-weight:800;color:#ffe600">${number}</span>
+    <button type="button" onclick="copyPayNum(this, '${number}')" style="padding:8px 12px;border-radius:8px;border:0;background:rgba(0,0,0,.35);color:#fff;cursor:pointer;font-weight:700">Copy</button>
+  </div>
+  <ul style="list-style:none;margin:0;padding:0">
+    <li style="${li}"><span>${amt}</span></li>
+    <li style="${li}"><span>এখন নিচের বক্সে আপনার <b class="hl">Transaction ID</b> দিন এবং <b class="hl">SUBMIT</b> করুন।</span></li>
+  </ul>`;
+}
 function renderPayMethods(){
   const methods = sellerMethods();
   if(!methods.includes(selectedPayMethod)) selectedPayMethod = methods[0];
   document.getElementById('payMethods').innerHTML = methods.map(m =>
-    `<button type="button" class="btn pay-method-btn${m === selectedPayMethod ? '' : ' outline'}" onclick="selectPayMethod('${m}')" style="flex:1"><img src="/mfs/${m}.png" alt="${methodName(m)}"><span>${methodName(m)}</span></button>`).join('');
+    `<button type="button" class="pay-method-card" onclick="selectPayMethod('${m}')"><img src="/mfs/${m}.png" alt="${methodName(m)}"><span>${methodName(m)} SendMoney</span></button>`).join('');
 }
 function applyPayMethod(){
   const methods = sellerMethods();
   if(!methods.includes(selectedPayMethod)) selectedPayMethod = methods[0];
   const nums = pricingData?.sellerNumbers || {};
   const name = methodName(selectedPayMethod);
-  document.getElementById('payMethodTitle').textContent = 'Pay by ' + name + ' Send Money';
-  document.getElementById('payMethodName').textContent = name;
-  document.getElementById('payNumber').textContent = nums[selectedPayMethod] || '';
+  const p = pkgById(selectedPackage);
+  document.getElementById('payDetailLogo').src = '/mfs/' + selectedPayMethod + '.png';
+  document.getElementById('payDetailLogo').alt = name;
+  document.getElementById('payDetailAmount').textContent = p ? '৳' + p.priceBDT : '';
+  const panel = document.getElementById('payDetailPanel');
+  panel.style.background = MFS_BRAND[selectedPayMethod].color;
+  panel.innerHTML = mfsInstructionsHtml(selectedPayMethod, nums[selectedPayMethod] || '', p ? p.priceBDT : '');
+  document.getElementById('orderSubmitBtn').style.background = MFS_BRAND[selectedPayMethod].color;
   document.getElementById('trxidLabel').textContent = 'TrxID (from your ' + name + ' payment)';
   document.getElementById('senderLabel').textContent = 'Your ' + name + ' number (the number you paid from)';
 }
 function selectPayMethod(m){
   selectedPayMethod = m;
-  renderPayMethods();
   applyPayMethod();
+  document.getElementById('payMethodList').style.display = 'none';
+  document.getElementById('payMethodDetail').style.display = 'block';
   setEnrollTitle('Pay by ' + methodName(m) + ' Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID.');
 }
-function copyPayNumber(){
-  navigator.clipboard.writeText(document.getElementById('payNumber').textContent);
-  document.getElementById('payCopyBtn').textContent = 'Copied!';
+function backToPayMethods(){
+  document.getElementById('payMethodDetail').style.display = 'none';
+  document.getElementById('payMethodList').style.display = 'block';
+  setEnrollTitle('Choose a payment method', 'Step 3 of 3 — tap a method to see the number and pay.');
+}
+function copyPayNum(btn, num){
+  navigator.clipboard.writeText(num);
+  btn.textContent = 'Copied!';
 }
 async function loadPricing(){
   const r = await fetch('/api/public/pricing');
@@ -268,7 +321,9 @@ function showPlanStep(){
 }
 function showPayStep(){
   updatePayStep();
-  setEnrollTitle('Pay by ' + methodName(selectedPayMethod) + ' Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID.');
+  document.getElementById('payMethodDetail').style.display = 'none';
+  document.getElementById('payMethodList').style.display = 'block';
+  setEnrollTitle('Choose a payment method', 'Step 3 of 3 — tap a method to see the number and pay.');
   hideAllSteps();
   document.getElementById('payStep').style.display = 'block';
 }

@@ -1236,63 +1236,114 @@ app.post('/api/v1/confirm', (req, res) => {
 
 // ---------- Hosted pay page ----------
 
+// v2.9.6: ZiniPay-style two-step pay flow — this page lists the merchant's
+// methods (logo cards); tapping one opens a NEW brand-coloured method page
+// with the number + Bangla instructions + TrxID. Unregistered methods never
+// appear. Brand colours + USSD codes are the methods' own.
+const MFS_BRAND = {
+  bkash: { label: 'bKash', ussd: '*247#', color: '#e2136e' },
+  nagad: { label: 'Nagad', ussd: '*167#', color: '#ed1c24' },
+  rocket: { label: 'Rocket', ussd: '*322#', color: '#8c3494' },
+  upay: { label: 'Upay', ussd: '*268#', color: '#111111' },
+};
+
 function payPageHtml(brand, merchant, numbers, amount, orderId, notice) {
   const amountText = amount ? `৳${escapeHtml(amount)}` : '';
-  // v2.9.4: the customer picks a payment method — the merchant's registered
-  // methods only, as logo options. Unregistered methods never appear.
-  const methodLabels = { bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', upay: 'Upay' };
   const methods = ALL_METHODS.filter((m) => numbers.some((n) => n.method === m));
-  const options = methods.map((m) => `
-    <button type="button" class="mfs-opt${m === methods[0] ? ' selected' : ''}" data-method="${m}" onclick="selectMfs('${m}')">
-      <img src="/mfs/${m}.png" alt="${escapeHtml(methodLabels[m])}"><span>${escapeHtml(methodLabels[m])}</span>
-    </button>`).join('');
-  const details = methods.map((m) => {
-    const rows = numbers.filter((n) => n.method === m).map((n) => `
-    <div class="num">
-      <div><span class="paynum">${escapeHtml(n.number)}</span>
-      ${n.label ? `<span class="label">${escapeHtml(n.label)}</span>` : ''}</div>
-      <button type="button" onclick="copyNum(this, '${escapeHtml(n.number)}')">Copy</button>
-    </div>`).join('');
-    return `<div class="mfs-detail" id="mfs-detail-${m}"${m === methods[0] ? '' : ' style="display:none"'}>${rows}</div>`;
-  }).join('');
+  const qs = [amount ? `amount=${encodeURIComponent(amount)}` : '', orderId ? `order_id=${encodeURIComponent(orderId)}` : ''].filter(Boolean).join('&');
+  const q = qs ? `?${qs}` : '';
+  const cards = methods.map((m) => `
+    <a class="mfs-card" href="/pay/${escapeHtml(merchant.pay_key)}/${m}${q}">
+      <img src="/mfs/${m}.png" alt="${escapeHtml(MFS_BRAND[m].label)}"><span>${escapeHtml(MFS_BRAND[m].label)} SendMoney</span>
+    </a>`).join('');
   const body = methods.length
-    ? `<p class="muted">Choose a payment method:</p>\n<div class="mfs-grid">${options}</div>\n${details}`
+    ? `<p class="muted">Choose a payment method:</p>\n<div class="mfs-grid">${cards}</div>`
     : '<p>No payment numbers added yet.</p>';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pay — ${escapeHtml(brand)}</title>
 <style>body{font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f7f7f7;color:#222}
 .card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
-.num{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #eee}
-.label{color:#666;font-size:13px}button{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#111;color:#fff;cursor:pointer}
-input,select{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
-h1{font-size:22px}.muted{color:#666;font-size:14px}.notice{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px}
-.mfs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin:12px 0}
-.mfs-opt{border:2px solid #e5e5e5;border-radius:12px;padding:10px 6px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:#222}
-.mfs-opt.selected{border-color:#0f766e;background:#f0fdfa}
-.mfs-opt img{height:36px;max-width:90%;object-fit:contain}
-.mfs-opt span{font-size:13px;font-weight:700}
-.mfs-detail{margin:4px 0 8px}
-.paynum{font-size:20px;font-weight:700}</style></head><body>
+.muted{color:#666;font-size:14px}.notice{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px}
+h1{font-size:22px}
+.mfs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:12px 0}
+.mfs-card{border:1px solid #e5e5e5;border-radius:16px;padding:22px 10px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:14px;color:#222;text-decoration:none}
+.mfs-card img{height:44px;max-width:80%;object-fit:contain}
+.mfs-card span{font-size:15px;font-weight:600;color:#333}</style></head><body>
 <div class="card"><h1>Pay ${escapeHtml(brand)}</h1>
 ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
-<p class="muted">Pay to ${escapeHtml(merchant.name)} — choose a method, send the exact amount to that number, then enter your TrxID below.</p>
+<p class="muted">Pay to ${escapeHtml(merchant.name)} — choose a method to see the number and pay.</p>
 ${amountText ? `<p><strong>Amount:</strong> ${amountText}</p>` : ''}
 ${orderId ? `<p><strong>Order:</strong> ${escapeHtml(orderId)}</p>` : ''}
 ${body}
+<p class="muted">Money goes directly to the seller's own bKash / Nagad / Rocket / Upay number. ${escapeHtml(brand)} only verifies the payment.</p>
+</div></body></html>`;
+}
+
+// v2.9.6: the method page — opens when the customer taps a method card.
+// Brand-coloured panel, Bangla instructions, the merchant's number for
+// THIS method only, TrxID input + VERIFY button.
+function payMethodPageHtml(brand, merchant, method, numbers, amount, orderId) {
+  const b = MFS_BRAND[method];
+  const rows = numbers.filter((n) => n.method === method);
+  const amountText = amount ? `৳${escapeHtml(amount)}` : '';
+  const amountLine = amount
+    ? `পরিমাণ: <b class="hl">${escapeHtml(amount)} টাকা</b> দিয়ে <b class="hl">SUBMIT</b> করুন।`
+    : `পরিমাণ: আপনার অর্ডারের টাকা দিয়ে <b class="hl">SUBMIT</b> করুন।`;
+  const numRows = rows.map((n) => `
+    <div class="numrow">
+      <div><span class="paynum">${escapeHtml(n.number)}</span>${n.label ? ` <span class="numlabel">${escapeHtml(n.label)}</span>` : ''}</div>
+      <button type="button" onclick="copyNum(this, '${escapeHtml(n.number)}')">Copy</button>
+    </div>`).join('');
+  const qs = [amount ? `amount=${encodeURIComponent(amount)}` : '', orderId ? `order_id=${encodeURIComponent(orderId)}` : ''].filter(Boolean).join('&');
+  const q = qs ? `?${qs}` : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(b.label)} — Pay ${escapeHtml(brand)}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:16px;background:#f7f7f7;color:#222}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.back{color:#333;text-decoration:none;font-size:15px;font-weight:600}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:16px 0}
+.top img{height:52px;max-width:45%;object-fit:contain}
+.amt{font-size:24px;font-weight:800;color:#333}
+.note{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px;text-align:center;color:#8a6d00}
+.panel{background:${b.color};border-radius:16px;padding:22px;color:#fff;margin:14px 0}
+.panel h2{text-align:center;margin:0 0 14px;font-size:22px}
+.panel input{width:100%;padding:12px;border:0;border-radius:10px;font-size:16px;text-align:center;box-sizing:border-box}
+.panel h3{margin:18px 0 6px;font-size:15px;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.35);padding-bottom:8px}
+.panel ul{list-style:none;margin:0;padding:0}
+.panel li{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.25);font-size:15px;line-height:1.5}
+.panel li:last-child{border-bottom:0}
+.panel li::before{content:"•";flex:none}
+.hl{color:#ffe600}
+.numrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.25)}
+.paynum{font-size:22px;font-weight:800;color:#ffe600}
+.numlabel{color:rgba(255,255,255,.8);font-size:13px}
+.numrow button{padding:8px 12px;border-radius:8px;border:0;background:rgba(0,0,0,.35);color:#fff;cursor:pointer;font-weight:700}
+.verify{width:100%;padding:16px;border:0;border-radius:16px;background:${b.color};color:#fff;font-size:18px;font-weight:800;cursor:pointer;letter-spacing:.5px}</style></head><body>
+<div class="card">
+<a class="back" href="/pay/${escapeHtml(merchant.pay_key)}${q}">← ${escapeHtml(merchant.name)}</a>
+<div class="top"><img src="/mfs/${method}.png" alt="${escapeHtml(b.label)}"><span class="amt">${amountText}</span></div>
+<p class="note">নোট: টাকা পাঠানোর ৫-১০ সেকেন্ড পর ভেরিফাই করবেন।</p>
 <form method="POST" action="/pay/${escapeHtml(merchant.pay_key)}/claim">
 <input type="hidden" name="amount" value="${escapeHtml(amount || '')}">
 <input type="hidden" name="order_id" value="${escapeHtml(orderId || '')}">
-<input type="hidden" name="method" id="payMethodInput" value="${methods[0] || 'bkash'}">
-<label>TrxID</label><input name="transactionId" required placeholder="e.g. 9AB12CD34E">
-<button type="submit" style="width:100%">I have paid — Confirm</button></form>
-<p class="muted">Money goes directly to the seller's own bKash / Nagad / Rocket / Upay number. ${escapeHtml(brand)} only verifies the payment.</p>
+<input type="hidden" name="method" value="${method}">
+<div class="panel"><h2>ট্রানজেকশন আইডি দিন</h2>
+<input name="transactionId" required placeholder="ট্রানজেকশন আইডি দিন">
+<h3>INSTRUCTIONS</h3>
+<ul>
+<li><span><b class="hl">${b.ussd}</b> ডায়াল করে আপনার <b class="hl">${b.label.toUpperCase()}</b> মোবাইল মেনুতে যান অথবা <b class="hl">${b.label.toUpperCase()}</b> অ্যাপে যান।</span></li>
+<li><span>"<b class="hl">Send Money</b>"-এ ক্লিক করুন।</span></li>
+<li><span>প্রাপক নম্বর হিসেবে এই নম্বরটি লিখুন:</span></li>
+</ul>
+${numRows}
+<ul>
+<li><span>${amountLine}</span></li>
+<li><span>এখন উপরের বক্সে আপনার <b class="hl">Transaction ID</b> দিন এবং <b class="hl">VERIFY</b> করুন।</span></li>
+</ul></div>
+<button type="submit" class="verify">VERIFY TRANSACTION</button></form>
 </div><script>
-function selectMfs(m){
-  document.querySelectorAll('.mfs-opt').forEach(function(b){ b.classList.toggle('selected', b.dataset.method === m); });
-  document.querySelectorAll('.mfs-detail').forEach(function(d){ d.style.display = d.id === 'mfs-detail-' + m ? '' : 'none'; });
-  document.getElementById('payMethodInput').value = m;
-}
 function copyNum(btn, num){ navigator.clipboard.writeText(num); btn.textContent = 'Copied!'; }
 </script></body></html>`;
 }
@@ -1359,6 +1410,36 @@ app.get('/pay/:payKey', (req, res) => {
     ? `Note: this seller’s package is in its ${getGraceDays()}-day grace period (renewal pending) — payments still work normally.`
     : null;
   return res.send(payPageHtml(getBrand(), merchant, numbers, req.query.amount, req.query.order_id, notice));
+});
+
+// v2.9.6: the method page — the customer lands here after tapping a method
+// card. Shows only that method's number + Bangla instructions + TrxID.
+app.get('/pay/:payKey/:method', (req, res) => {
+  const merchant = db.prepare('SELECT * FROM merchants WHERE pay_key = ?').get(req.params.payKey);
+  if (!merchant) return res.status(404).send(resultPageHtml(getBrand(), 'Not found', 'This payment link is invalid.', null, null));
+  const blocked = merchantBlocked(merchant);
+  if (blocked) {
+    if (blocked.error === 'PACKAGE_NOT_ACTIVE') {
+      return res.status(403).send(resultPageHtml(getBrand(),
+        'Payment link not active yet',
+        'This seller’s package is waiting for approval. Please try again later or contact the seller.',
+        null, null));
+    }
+    const expired = blocked.error === 'PACKAGE_EXPIRED';
+    return res.status(403).send(resultPageHtml(getBrand(),
+      expired ? 'Payment link expired' : 'Payment link disabled',
+      expired
+        ? 'This seller’s package has expired. Please contact the seller to renew.'
+        : 'This payment link is currently disabled. Please contact the seller.',
+      null, null));
+  }
+  const method = req.params.method;
+  const numbers = db.prepare('SELECT * FROM numbers WHERE merchant_id = ? ORDER BY id').all(merchant.id);
+  if (!MFS_BRAND[method] || !numbers.some((n) => n.method === method)) {
+    return res.status(404).send(resultPageHtml(getBrand(), 'Method not available',
+      'This payment method is not available for this seller.', null, null));
+  }
+  return res.send(payMethodPageHtml(getBrand(), merchant, method, numbers, req.query.amount, req.query.order_id));
 });
 
 app.post('/pay/:payKey/claim', (req, res) => {
