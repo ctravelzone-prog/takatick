@@ -58,6 +58,24 @@ async function adminLogin(password = ADMIN_PASSWORD) {
   return r;
 }
 
+async function approveOrder(orderId) {
+  const r = await req(`/api/admin/orders/${orderId}/approve`, {
+    method: 'POST', token: adminToken, body: {},
+  });
+  assert.equal(r.status, 200, `approve order ${orderId}: ${JSON.stringify(r.json)}`);
+  return r.json;
+}
+
+const ORDER_PRICES = { basic: 300, standard: 600, premium: 900 };
+async function activateMerchant(token, pkg, trxid) {
+  const order = await req('/api/me/orders', {
+    method: 'POST', token,
+    body: { package: pkg, trxid, sender: SELLER_BKASH, amount: ORDER_PRICES[pkg] },
+  });
+  assert.equal(order.status, 201, `activate order: ${JSON.stringify(order.json)}`);
+  await approveOrder(order.json.order.id);
+}
+
 test.before(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'takatick-storefront-'));
   process.env.DB_PATH = path.join(tmpDir, 'test.db');
@@ -216,12 +234,15 @@ test('admin reject keeps the old package', async () => {
   assert.equal(reject.json.order.status, 'rejected');
   const profile = await req('/api/me/profile', { token: buyer2.token });
   assert.equal(profile.json.merchant.package, 'basic');
+  // Still pending — rejection does not activate anything.
+  assert.equal(profile.json.expiryState, 'pending');
 });
 
 let expiryMerchant;
 
 test('expiry: 4 days past expiry -> verify 403 PACKAGE_EXPIRED + pay page blocked', async () => {
   expiryMerchant = await signup('Expiry Merchant', 'expiry@takatick.test', 'premium');
+  await activateMerchant(expiryMerchant.token, 'premium', 'EXPIRE-ACT-1');
   const ingest = await req('/api/sms', {
     method: 'POST', appKey: expiryMerchant.appKey,
     body: { sender: 'bKash', text: 'You have received Tk 1,000.00 from 01712345678. TrxID: EXPIRE0001. Thank you.' },
@@ -320,8 +341,12 @@ test('admin merchants list shows expiry state; manual package change works', asy
 
 test('renewal during grace: approve resets expiry to approval + 30d (not stacked)', async () => {
   const { db } = require('../server');
-  const oldExpiry = db.prepare('SELECT package_expires_at FROM merchants WHERE id = ?')
-    .get(expiryMerchant.merchant.id).package_expires_at;
+  // The previous test's manual package change gave a fresh 30-day window;
+  // put the merchant back into grace (1 day past expiry) for this test.
+  const oneDayAgo = new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString();
+  db.prepare('UPDATE merchants SET package_expires_at = ? WHERE id = ?')
+    .run(oneDayAgo, expiryMerchant.merchant.id);
+  const oldExpiry = oneDayAgo;
   const order = await req('/api/me/orders', {
     method: 'POST', token: expiryMerchant.token,
     body: { package: 'premium', trxid: 'RENEW00001', sender: SELLER_BKASH, amount: 900 },
@@ -342,13 +367,73 @@ test('renewal during grace: approve resets expiry to approval + 30d (not stacked
   assert.ok(gapDays > 30.5 && gapDays < 31.5, `renewal gap days: ${gapDays}`);
 });
 
-test('new signup gets a 30-day window from signup', async () => {
-  const before = Date.now();
-  const m = await signup('Window Merchant', 'window@takatick.test', 'basic');
+test('signup is pending: no service until admin approves (Siam bug report)', async () => {
+  const m = await signup('Pending Merchant', 'pending@takatick.test', 'basic');
   const profile = await req('/api/me/profile', { token: m.token });
-  const deltaDays = (new Date(profile.json.packageExpiresAt).getTime() - before) / (24 * 3600 * 1000);
-  assert.ok(deltaDays > 29.9 && deltaDays < 30.1, `signup window days: ${deltaDays}`);
+  assert.equal(profile.json.expiryState, 'pending');
+  assert.equal(profile.json.packageExpiresAt, null);
+
+  // SMS ingest stores the transaction, but verify is blocked while pending.
+  await req('/api/sms', {
+    method: 'POST', appKey: m.appKey,
+    body: { sender: 'bKash', text: 'You have received Tk 1,000.00 from 01712345678. TrxID: PEND00001. Thank you.' },
+  });
+  const verify = await req('/api/v1/verify', {
+    method: 'POST',
+    body: { apiKey: m.apiKey, amount: 1000, transactionId: 'PEND00001' },
+  });
+  assert.equal(verify.status, 403);
+  assert.equal(verify.json.error, 'PACKAGE_NOT_ACTIVE');
+
+  // Pay page blocked while pending.
+  const payPage = await req(`/pay/${m.payKey}?amount=1000`);
+  assert.equal(payPage.status, 403);
+  assert.match(payPage.text, /not active yet/i);
+
+  // Order + approve activates with a fresh 30 days.
+  const before = Date.now();
+  await activateMerchant(m.token, 'basic', 'PEND-ORDER-1');
+  const after = await req('/api/me/profile', { token: m.token });
+  assert.equal(after.json.expiryState, 'active');
+  const deltaDays = (new Date(after.json.packageExpiresAt).getTime() - before) / (24 * 3600 * 1000);
+  assert.ok(deltaDays > 29.9 && deltaDays < 30.1, `activation window days: ${deltaDays}`);
+
+  // Now the earlier SMS verifies fine.
+  const verify2 = await req('/api/v1/verify', {
+    method: 'POST',
+    body: { apiKey: m.apiKey, amount: 1000, transactionId: 'PEND00001' },
+  });
+  assert.equal(verify2.json.ok, true, JSON.stringify(verify2.json));
+});
+
+test('admin manual package change activates a pending merchant', async () => {
+  const m = await signup('Manual Merchant', 'manual@takatick.test', 'basic');
+  const before = Date.now();
+  const change = await req(`/api/admin/merchants/${m.merchant.id}/package`, {
+    method: 'POST', token: adminToken, body: { package: 'standard' },
+  });
+  assert.equal(change.status, 200, JSON.stringify(change.json));
+  assert.equal(change.json.merchant.package, 'standard');
+  assert.equal(change.json.merchant.status, 'active');
+  const profile = await req('/api/me/profile', { token: m.token });
   assert.equal(profile.json.expiryState, 'active');
+  const deltaDays = (new Date(profile.json.packageExpiresAt).getTime() - before) / (24 * 3600 * 1000);
+  assert.ok(deltaDays > 29.9 && deltaDays < 30.1, `manual activation window days: ${deltaDays}`);
+});
+
+test('landing + login pages: logged-in nav hooks present', async () => {
+  const home = await req('/');
+  assert.match(home.text, /id="authNav"/);
+  assert.match(home.text, /id="heroSignup"/);
+  assert.match(home.text, /\/api\/me\/profile/);
+  assert.match(home.text, /My profile/);
+  assert.match(home.text, /border-radius:50%/);
+  assert.match(home.text, /href="\/dashboard\.html"/);
+  assert.match(home.text, /Go to dashboard/);
+  assert.match(home.text, /id="enrollTitle"/);
+  const login = await req('/login.html');
+  assert.match(login.text, /location\.href='\/dashboard\.html'/);
+  assert.match(login.text, /location\.href='\/\#enroll'/);
 });
 
 test('admin login returns ADMIN_NOT_CONFIGURED when no admin exists', async () => {

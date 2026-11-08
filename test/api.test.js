@@ -62,7 +62,38 @@ async function signup(name, email, pkg) {
   });
   assert.equal(login.json.ok, true);
   assert.ok(login.json.token);
+  // v1.5: signups are pending — activate via order + admin approval,
+  // exactly like a real merchant, before using verify/pay-page.
+  await activate(login.json.token, pkg);
   return { ...r.json, token: login.json.token };
+}
+
+let adminTokenCache = null;
+async function adminToken() {
+  if (adminTokenCache) return adminTokenCache;
+  const r = await req('/api/admin/login', {
+    method: 'POST',
+    body: { email: 'admin@takatick.test', password: 'adminpass123' },
+  });
+  assert.equal(r.status, 200, `admin login: ${JSON.stringify(r.json)}`);
+  adminTokenCache = r.json.token;
+  return adminTokenCache;
+}
+
+let trxSeq = 0;
+async function activate(token, pkg) {
+  const prices = { basic: 300, standard: 600, premium: 900 };
+  trxSeq += 1;
+  const order = await req('/api/me/orders', {
+    method: 'POST', token,
+    body: { package: pkg, trxid: 'ACT' + String(trxSeq).padStart(6, '0'), sender: '01712345678', amount: prices[pkg] },
+  });
+  assert.equal(order.status, 201, `activate order: ${JSON.stringify(order.json)}`);
+  const tok = await adminToken();
+  const approve = await req(`/api/admin/orders/${order.json.order.id}/approve`, {
+    method: 'POST', token: tok, body: {},
+  });
+  assert.equal(approve.status, 200, `approve: ${JSON.stringify(approve.json)}`);
 }
 
 test.before(async () => {
@@ -70,6 +101,8 @@ test.before(async () => {
   process.env.DB_PATH = path.join(tmpDir, 'test.db');
   process.env.JWT_SECRET = 'test-secret';
   process.env.BRAND_NAME = 'TakaTick';
+  process.env.ADMIN_EMAIL = 'admin@takatick.test';
+  process.env.ADMIN_PASSWORD = 'adminpass123';
 
   // Tiny webhook catcher: records every signed webhook POST.
   catcherServer = http.createServer((reqClient, resClient) => {

@@ -65,8 +65,10 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
     <a class="link" href="#how">How it works</a>
     <a class="link" href="#pricing">Pricing</a>
     <a class="link" href="#faq">FAQ</a>
-    <a class="link" href="/login.html">Log in</a>
-    <a class="btn" href="#enroll">Sign up</a>
+    <span id="authNav">
+      <a class="link" href="/login.html">Log in</a>
+      <a class="btn" href="#enroll">Sign up</a>
+    </span>
   </nav>
 </header>
 
@@ -75,7 +77,7 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
     <h1>bKash, Nagad, Rocket &amp; Upay payments — verified automatically.</h1>
     <p>{{BRAND}} checks every payment your customers send to your own personal number — TrxID + exact amount, no manual checking, no holding your money.</p>
     <div class="cta">
-      <a class="btn big" href="#enroll">Sign up — start verifying</a>
+      <a class="btn big" href="#enroll" id="heroSignup">Sign up — start verifying</a>
       <a class="btn big ghost" href="#pricing">See pricing</a>
     </div>
   </div>
@@ -118,8 +120,8 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
 
 <section id="enroll" style="background:#fff">
   <div class="wrap">
-    <h2>Sign up &amp; buy a package</h2>
-    <p class="sub">Create your account, pay by bKash Send Money, submit the TrxID — admin approves and your package activates for 30 days.</p>
+    <h2 id="enrollTitle">Sign up &amp; buy a package</h2>
+    <p class="sub" id="enrollSub">Create your account, pay by bKash Send Money, submit the TrxID — admin approves and your package activates for 30 days.</p>
     <div class="enroll-box">
       <div id="enrollMsg"></div>
       <div id="signupStep">
@@ -250,11 +252,38 @@ document.getElementById('orderForm').addEventListener('submit', async e => {
   document.getElementById('pendingText').textContent =
     `Order #${o.order.id} (${p.name}, ৳${p.priceBDT}) is pending. Admin approve korle package active hobe (30 din) — dashboard-e check korun.`;
 });
-// Logged-in merchant: skip signup, show the pay form directly.
-if(localStorage.getItem('token')){
-  document.getElementById('signupStep').style.display = 'none';
-  document.getElementById('payStep').style.display = 'block';
+function logout(){ localStorage.removeItem('token'); location.reload(); }
+// Logged-in state: validate the token against the profile, then show
+// who is logged in (name + Dashboard + Log out) instead of Sign up /
+// Log in — so a logged-in merchant always sees where they are.
+async function updateNav(){
+  const token = localStorage.getItem('token');
+  if(!token) return;
+  try {
+    const r = await fetch('/api/me/profile', {headers:{Authorization:'Bearer '+token}});
+    const p = await r.json();
+    if(!p.ok) throw new Error(p.error || 'invalid token');
+    const name = String(p.merchant.name).replace(/[<>&"]/g,'');
+    const initial = (name.trim()[0] || '?').toUpperCase();
+    const stateLabel = {pending:'Waiting for approval', active:'Active', grace:'Grace period', expired:'Expired', deactivated:'Deactivated'}[p.expiryState] || p.expiryState;
+    document.getElementById('authNav').innerHTML =
+      `<a href="/dashboard.html" title="My profile &amp; dashboard" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#111">` +
+      `<span style="width:32px;height:32px;border-radius:50%;background:#111;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700">${initial}</span>` +
+      `<span style="text-align:left;line-height:1.25"><strong>${name}</strong><br><span style="font-size:12px;color:#666">${p.package.name} • ${stateLabel}</span></span></a> ` +
+      `<a class="link" href="#" onclick="logout();return false">Log out</a>`;
+    const hero = document.getElementById('heroSignup');
+    hero.textContent = 'Go to dashboard';
+    hero.href = '/dashboard.html';
+    document.getElementById('enrollTitle').textContent = 'Buy a package';
+    document.getElementById('enrollSub').textContent = 'You are logged in — pay by bKash Send Money, submit the TrxID, admin approves and your package activates for 30 days.';
+    document.getElementById('signupStep').style.display = 'none';
+    document.getElementById('payStep').style.display = 'block';
+  } catch (_e) {
+    // Dead/expired token: forget it, show the logged-out page.
+    localStorage.removeItem('token');
+  }
 }
+updateNav();
 loadPricing();
 </script>
 </body>

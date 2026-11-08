@@ -38,7 +38,7 @@ Package change kora jay dashboard theke. Limit sesh hole verify call `LIMIT_EXCE
 ## 2A. Package kena / renew kora (landing page) + admin panel
 
 **Kinben kivabe (buyer):**
-1. Website-er root page (`/`) theke package choose korun → signup (naam/email/password).
+1. Website-er root page (`/`) theke package choose korun → signup (naam/email/password). **Signup-er por account `pending` thake — approve na howa porjonto verify/confirm ar pay page bondho; dashboard-e 'Waiting for approval' dekhabe.**
 2. **bKash Send Money** korun exact package amount — number: **01740707570** (page-e dekhano thake, copy button ache).
 3. TrxID + je number theke pay korechen (sender) form-e bosiye submit korun — order `pending` hobe.
 4. Admin manually check kore approve korle package **30 din-er jonno active** hobe — dashboard-e package + expiry date dekhte paben.
@@ -47,7 +47,7 @@ Package change kora jay dashboard theke. Limit sesh hole verify call `LIMIT_EXCE
 
 **Expiry + 3 din grace:** 30 din sesh hole 3 din grace period — ei somoy verify/confirm ar pay page normal cholbe, dashboard-e "Grace period — X din baki, renew koro" banner dekhabe. Grace sesh hole verify `403 PACKAGE_EXPIRED` dibe ar pay page-e expired notice dekhabe — renew korlei abar cholbe.
 
-**Admin panel (`/admin.html`):** admin login (env `ADMIN_EMAIL` / `ADMIN_PASSWORD` diye banano account) → sob merchant-er list (package, status, expiry date, expiry state: active / expiring-soon / grace / expired / no-expiry, usage), order list (pending age) — approve korle package + 30-day expiry set hoy, reject korle purono package-i thake. Admin chaile merchant-er package manually bodlate pare, ar merchant deactivate/activate korte pare (deactivated merchant-er verify/confirm bondho hoye jay).
+**Admin panel (`/admin.html`):** admin login (env `ADMIN_EMAIL` / `ADMIN_PASSWORD` diye banano account) → sob merchant-er list (package, status, expiry date, expiry state: pending / active / expiring-soon / grace / expired / no-expiry, usage), order list (pending age) — approve korle package + 30-day expiry set hoy, reject korle purono package-i thake. Admin chaile merchant-er package manually bodlate pare (bodlalei active hoye fresh 30 din pabe), ar merchant deactivate/activate korte pare (deactivated merchant-er verify/confirm bondho hoye jay).
 
 ---
 

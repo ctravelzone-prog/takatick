@@ -160,7 +160,15 @@ ensureAdminSeeded();
 // package_expires_at NULL = no expiry (grandfathered accounts).
 // Otherwise: active until expires_at, then a grace period of
 // config graceDays during which everything still works, then expired.
+// status 'pending' = signed up but never approved (no service yet).
+// status 'deactivated' = admin turned the account off.
 function expiryState(merchant) {
+  if (merchant.status === 'pending') {
+    return { state: 'pending', daysLeft: null, graceDaysLeft: null, expiresAt: null };
+  }
+  if (merchant.status === 'deactivated') {
+    return { state: 'deactivated', daysLeft: null, graceDaysLeft: null, expiresAt: null };
+  }
   const exp = merchant.package_expires_at;
   if (!exp) return { state: 'active', daysLeft: null, graceDaysLeft: null, expiresAt: null };
   const expMs = new Date(exp).getTime();
@@ -176,12 +184,14 @@ function expiryState(merchant) {
 }
 
 // Returns { error, status } when the merchant may not verify/confirm
-// (deactivated, or expired past the grace period), else null.
-// Grace-period merchants are NOT blocked.
+// (never approved, deactivated, or expired past the grace period),
+// else null. Grace-period merchants are NOT blocked.
 function merchantBlocked(merchant) {
   if (!merchant) return { error: 'INVALID_API_KEY', status: 401 };
   if (merchant.status === 'deactivated') return { error: 'ACCOUNT_DEACTIVATED', status: 403 };
-  if (expiryState(merchant).state === 'expired') return { error: 'PACKAGE_EXPIRED', status: 403 };
+  const st = expiryState(merchant).state;
+  if (st === 'pending') return { error: 'PACKAGE_NOT_ACTIVE', status: 403 };
+  if (st === 'expired') return { error: 'PACKAGE_EXPIRED', status: 403 };
   return null;
 }
 
@@ -334,8 +344,8 @@ function adminMerchantRow(m) {
   const used = verificationsUsedThisMonth(m.id);
   const pkg = getPackage(m.package);
   let state = exp.state;
-  if (state === 'active' && exp.daysLeft !== null && exp.daysLeft <= 3) state = 'expiring-soon';
-  if (!m.package_expires_at) state = 'no-expiry';
+  if (state === 'active' && !m.package_expires_at) state = 'no-expiry';
+  else if (state === 'active' && exp.daysLeft !== null && exp.daysLeft <= 3) state = 'expiring-soon';
   return {
     id: m.id,
     name: m.name,
@@ -384,7 +394,7 @@ app.post('/api/admin/orders/:id/approve', adminAuth, (req, res) => {
   const decidedAt = nowIso();
   db.prepare("UPDATE orders SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?")
     .run(decidedAt, String(req.adminId), order.id);
-  db.prepare('UPDATE merchants SET package = ?, package_expires_at = ? WHERE id = ?')
+  db.prepare("UPDATE merchants SET package = ?, package_expires_at = ?, status = 'active' WHERE id = ?")
     .run(order.package, expiresAt, merchant.id);
   const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
   return res.json({ ok: true, order: updated, merchant: publicMerchant(getMerchantById(merchant.id)) });
@@ -405,13 +415,17 @@ app.post('/api/admin/merchants/:id/package', adminAuth, (req, res) => {
   if (!config.packages[pkgId]) return res.status(400).json({ ok: false, error: 'INVALID_PACKAGE' });
   const merchant = getMerchantById(req.params.id);
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  db.prepare('UPDATE merchants SET package = ? WHERE id = ?').run(pkgId, merchant.id);
+  // Admin action = activation: a pending merchant becomes active with a
+  // fresh 30 days; an active/expired merchant gets the same fresh window.
+  const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
+  db.prepare("UPDATE merchants SET package = ?, package_expires_at = ?, status = 'active' WHERE id = ?")
+    .run(pkgId, expiresAt, merchant.id);
   return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
 });
 
 app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
   const status = req.body?.status;
-  if (status !== 'active' && status !== 'deactivated') {
+  if (status !== 'active' && status !== 'deactivated' && status !== 'pending') {
     return res.status(400).json({ ok: false, error: 'INVALID_STATUS' });
   }
   const merchant = getMerchantById(req.params.id);
@@ -455,16 +469,18 @@ app.post('/api/auth/signup', (req, res) => {
   const apiKey = 'sk_live_' + crypto.randomBytes(24).toString('hex');
   const appKey = 'app_' + crypto.randomBytes(24).toString('hex');
   const createdAt = nowIso();
-  // New accounts start a 30-day window at signup (a trial). The first
-  // approved order resets the clock to approval + 30 days (fresh, never
-  // stacked). Accounts created before v1.3 have NULL expiry and are
-  // grandfathered — this only applies to new signups.
-  const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
+  // New accounts start PENDING — no package access until an order is
+  // approved by the admin (approval sets status='active' + expiry =
+  // approval + 30 days). The chosen package is only the REQUESTED
+  // package. v1.3 briefly gave a free 30-day trial at signup — removed
+  // in v1.5: Siam reported merchants got everything without paying or
+  // approval. Accounts created before v1.3 have NULL expiry and status
+  // 'active', and stay grandfathered.
   try {
     const info = db.prepare(
-      `INSERT INTO merchants (name, email, password_hash, package, package_expires_at, webhook_secret, pay_key, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(name.trim(), String(email).toLowerCase(), passwordHash, pkg, expiresAt, webhookSecret, payKey, createdAt);
+      `INSERT INTO merchants (name, email, password_hash, package, package_expires_at, status, webhook_secret, pay_key, created_at)
+       VALUES (?, ?, ?, ?, NULL, 'pending', ?, ?, ?)`
+    ).run(name.trim(), String(email).toLowerCase(), passwordHash, pkg, webhookSecret, payKey, createdAt);
     const merchantId = info.lastInsertRowid;
     db.prepare('INSERT INTO api_keys (merchant_id, key, label, created_at) VALUES (?, ?, ?, ?)')
       .run(merchantId, apiKey, 'default', createdAt);
@@ -831,6 +847,12 @@ app.get('/pay/:payKey', (req, res) => {
   if (!merchant) return res.status(404).send(resultPageHtml(getBrand(), 'Not found', 'This payment link is invalid.', null, null));
   const blocked = merchantBlocked(merchant);
   if (blocked) {
+    if (blocked.error === 'PACKAGE_NOT_ACTIVE') {
+      return res.status(403).send(resultPageHtml(getBrand(),
+        'Payment link not active yet',
+        'This seller’s package is waiting for approval. Please try again later or contact the seller.',
+        null, null));
+    }
     const expired = blocked.error === 'PACKAGE_EXPIRED';
     return res.status(403).send(resultPageHtml(getBrand(),
       expired ? 'Payment link expired' : 'Payment link disabled',
@@ -853,6 +875,12 @@ app.post('/pay/:payKey/claim', (req, res) => {
   if (!merchant) return res.status(404).send(resultPageHtml(brand, 'Not found', 'This payment link is invalid.', null, null));
   const blocked = merchantBlocked(merchant);
   if (blocked) {
+    if (blocked.error === 'PACKAGE_NOT_ACTIVE') {
+      return res.status(403).send(resultPageHtml(brand,
+        'Payment not active yet',
+        'This seller’s package is waiting for approval. Please try again later or contact the seller.',
+        merchant.fail_url, 'Return to store'));
+    }
     return res.status(403).send(resultPageHtml(brand,
       blocked.error === 'PACKAGE_EXPIRED' ? 'Payment expired' : 'Payment disabled',
       blocked.error === 'PACKAGE_EXPIRED'

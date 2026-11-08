@@ -65,8 +65,18 @@ async function load(){
     `Methods: ${(p.package.methods||[]).join(', ')}<br>`+
     `Verifications this month: ${p.usage.verificationsUsedThisMonth} / ${p.usage.verificationsLimit ?? 'unlimited'}</p>`;
   const expDate = p.packageExpiresAt ? new Date(p.packageExpiresAt).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : null;
+  const o = await api('/api/me/orders');
+  const pendingOrder = (o.orders||[]).find(x=>x.status==='pending');
   let banner = '';
-  if(p.expiryState === 'expired'){
+  if(p.expiryState === 'pending'){
+    banner = pendingOrder
+      ? `<p style="color:#8a6d00;font-weight:700">⏳ Waiting for approval</p><p>Order #${pendingOrder.id} (${esc(pendingOrder.package)}, ৳${(pendingOrder.amount_poisha/100).toFixed(2)}) is pending. Admin approve korle package active hobe (30 din) — verification ekhon bondho ache.</p>`
+      : `<p style="color:#b00;font-weight:700">No active package</p><p>Your account is waiting for a package purchase. Verification is off until admin approves your order.</p><button onclick="location.href='/#pricing'">Buy a package</button>`;
+    document.getElementById('pkgBanner').style.borderLeftColor = '#c9a227';
+  } else if(p.expiryState === 'deactivated'){
+    banner = `<p style="color:#b00;font-weight:700">Account deactivated</p><p>Verification is stopped. Contact the admin to reactivate your account.</p>`;
+    document.getElementById('pkgBanner').style.borderLeftColor = '#b00';
+  } else if(p.expiryState === 'expired'){
     banner = `<p style="color:#b00;font-weight:700">Expired — Renew koro</p><p>Your package expired on ${esc(expDate)}. Verification is stopped until you renew. Your API keys and data are safe — renewal reuses the same keys.</p><button onclick="location.href='/#pricing'">Renew now</button>`;
     document.getElementById('pkgBanner').style.borderLeftColor = '#b00';
   } else if(p.expiryState === 'grace'){
@@ -95,7 +105,6 @@ async function load(){
   const v = await api('/api/me/verifications');
   document.getElementById('verifs').innerHTML = '<table><tr><th>ID</th><th>Order</th><th>Amount</th><th>TrxID</th><th>Status</th><th>Created</th></tr>'+
     (v.verifications||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.order_id||'')}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td>${esc(x.transaction_id)}</td><td>${esc(x.status)}</td><td>${esc(x.created_at)}</td></tr>`).join('')+'</table>';
-  const o = await api('/api/me/orders');
   const orderRows = (o.orders||[]).map(x=>`<tr><td>${x.id}</td><td>${esc(x.package)}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td>${esc(x.trxid)}</td><td>${esc(x.status)}</td><td>${esc(x.created_at)}</td></tr>`).join('');
   document.getElementById('orders').innerHTML = orderRows
     ? '<table><tr><th>ID</th><th>Package</th><th>Amount</th><th>TrxID</th><th>Status</th><th>Created</th></tr>' + orderRows + '</table>'

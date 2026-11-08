@@ -36,10 +36,11 @@ button{width:100%;padding:11px;border:0;border-radius:8px;background:#111;color:
 </select>
 <button type="submit">Create account</button>
 </form>
-<p class="muted">On signup you get an API key, an app key and a pay link — shown once, save them.</p>
+<p class="muted">On signup your account is pending — pay by bKash and submit the TrxID from the home page; admin approves and your package activates for 30 days.</p>
 <p class="muted"><a href="/">← Back to TakaTick website</a> · <a href="/#pricing">See packages &amp; buy</a> · <a href="/admin.html">Admin</a></p>
 </div>
 <script>
+if(localStorage.getItem('token')) location.href='/dashboard.html';
 const msg = document.getElementById('msg');
 function show(o){ msg.textContent = o.ok ? '' : (o.error || 'Failed'); }
 async function post(url, body){
@@ -58,8 +59,9 @@ document.getElementById('signupForm').addEventListener('submit', async (e)=>{
   const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: f.get('package')});
   if(o.ok){
     alert('Account created!\nAPI key: '+o.apiKey+'\nApp key: '+o.appKey+'\nPay key: '+o.payKey+'\nWebhook secret: '+o.webhookSecret+'\n\nSave these now — they are shown once.');
-    localStorage.setItem('token', ''); // login separately
-    msg.textContent = 'Account created. Please log in above.';
+    const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
+    if(login.ok){ localStorage.setItem('token', login.token); location.href='/#enroll'; }
+    else { msg.textContent = 'Account created. Please log in above.'; }
   } else show(o);
 });
 </script>
