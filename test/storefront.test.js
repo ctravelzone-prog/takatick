@@ -433,7 +433,20 @@ test('landing + login pages: logged-in nav hooks present', async () => {
   assert.match(home.text, /id="enrollTitle"/);
   const login = await req('/login.html');
   assert.match(login.text, /location\.href='\/dashboard\.html'/);
-  assert.match(login.text, /location\.href='\/\#enroll'/);
+  assert.match(login.text, /location\.href='\/\#pricing'/);
+});
+
+test('enroll is a stepped wizard: hidden until a plan is chosen', async () => {
+  const home = await req('/');
+  assert.match(home.text, /id="enroll" style="background:#fff;display:none"/);
+  assert.match(home.text, /id="planStep"/);
+  assert.match(home.text, /id="planOptions"/);
+  assert.match(home.text, /showEnroll\(\)/);
+  assert.match(home.text, /Choose your plan/);
+  assert.match(home.text, /Continue to payment/);
+  assert.match(home.text, /Step 1 of 3/);
+  assert.match(home.text, /Step 2 of 3/);
+  assert.match(home.text, /Step 3 of 3/);
 });
 
 test('admin login returns ADMIN_NOT_CONFIGURED when no admin exists', async () => {

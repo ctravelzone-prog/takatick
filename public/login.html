@@ -60,7 +60,7 @@ document.getElementById('signupForm').addEventListener('submit', async (e)=>{
   if(o.ok){
     alert('Account created!\nAPI key: '+o.apiKey+'\nApp key: '+o.appKey+'\nPay key: '+o.payKey+'\nWebhook secret: '+o.webhookSecret+'\n\nSave these now — they are shown once.');
     const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
-    if(login.ok){ localStorage.setItem('token', login.token); location.href='/#enroll'; }
+    if(login.ok){ localStorage.setItem('token', login.token); location.href='/#pricing'; }
     else { msg.textContent = 'Account created. Please log in above.'; }
   } else show(o);
 });
