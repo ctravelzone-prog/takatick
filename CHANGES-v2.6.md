@@ -25,3 +25,10 @@ package hisebe dekhacchilo, order ache kina na dekhei.
   waitingPackage null, onno package-er order dile waiting package order-er
   tai hoy, approve-er por asol package hoy; dashboard/landing-e "No package
   yet" lekha ache).
+
+## v2.6.1 — enroll page header-o eki niyom
+- Live check-e dhora pore: dashboard thik holeo `public/enroll.html`-er
+  header chip "Basic • Waiting for approval" dekhacchilo (updateNav-e purono
+  logic chilo). Index-er motoi thik kora hoyeche — order na thakle "No
+  package • No package yet", order thakle order-er plan.
+- Test 61/61 (v1.8 chip test update kora hoyeche).

@@ -279,8 +279,12 @@ async function updateNav(){
     const r = await fetch('/api/me/profile', {headers:{Authorization:'Bearer '+token}});
     const p = await r.json();
     if(!p.ok) throw new Error(p.error || 'invalid token');
-    const stateLabel = {pending:'Waiting for approval', active:'Active', grace:'Grace period', expired:'Expired', deactivated:'Deactivated'}[p.expiryState] || p.expiryState;
-    setProfileChip(p.merchant.name, p.package.name, stateLabel);
+    // v2.6.1: same rule as the landing page — no package bought yet means
+    // the chip must not claim Basic.
+    const waitingPkg = p.expiryState === 'pending' ? p.waitingPackage : null;
+    const chipPkg = waitingPkg ? waitingPkg.name : (p.expiryState === 'pending' ? 'No package' : p.package.name);
+    const stateLabel = p.expiryState === 'pending' && !waitingPkg ? 'No package yet' : ({pending:'Waiting for approval', active:'Active', grace:'Grace period', expired:'Expired', deactivated:'Deactivated'}[p.expiryState] || p.expiryState);
+    setProfileChip(p.merchant.name, chipPkg, stateLabel);
   } catch (_e) {
     // Dead/expired token: forget it, show the logged-out page.
     localStorage.removeItem('token');

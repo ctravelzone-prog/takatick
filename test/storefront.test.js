@@ -601,7 +601,8 @@ test('v1.8 optimistic profile chip: setProfileChip sets the chip from signup dat
   assert.match(page.text, /function setProfileChip/);
   assert.match(page.text, /setProfileChip\(f\.get\('name'\)/);
   assert.match(page.text, /Waiting for approval/);
-  assert.match(page.text, /setProfileChip\(p\.merchant\.name, p\.package\.name, stateLabel\)/);
+  assert.match(page.text, /setProfileChip\(p\.merchant\.name, chipPkg, stateLabel\)/);
+  assert.match(page.text, /No package yet/);
   // The landing still shows the chip for logged-in merchants via updateNav.
   const home = await req('/');
   assert.match(home.text, /function setProfileChip/);
