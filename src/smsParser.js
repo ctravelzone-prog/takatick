@@ -21,20 +21,25 @@
 // or { error, reason } when the message cannot be parsed.
 'use strict';
 
-const AMOUNT_RE = /Tk\s*([\d,]+\.\d{2})/;
-const TRXID_RE = /(?:TrxID|Trx ID|Transaction ID)\s*:?\s*([A-Za-z0-9]{8,})/i;
-const SENDER_NUMBER_RE = /from\s+(01[3-9]\d{8})/i;
+// v2.9.8: tolerant — Nagad likhe "TxnID" + "Tk." (dot), Upay likhe "BDT",
+// Rocket "TxnID" o likhe; amount-e decimal-o na thakte pare ("Tk 10").
+// TrxID kompokkhe 6 okkhor (bKash 10, Nagad 8).
+const AMOUNT_RE = /(?:Tk|BDT|৳)\.?\s*([\d,]+(?:\.\d{1,2})?)/i;
+const TRXID_RE = /(?:Trx\.?\s*ID|Txn\.?\s*ID|Transaction\s*ID|Tx\.?\s*ID)\s*:?\s*([A-Za-z0-9]{6,})/i;
+const SENDER_NUMBER_RE = /(?:from|by)\s+(01[3-9]\d{8})/i;
 
 function detectMethod(sender, text) {
   const s = String(sender || '').trim().toLowerCase();
   if (s === 'bkash' || s === '16247') return 'bkash';
   if (s === 'nagad' || s === '16167') return 'nagad';
   if (s === 'rocket' || s === '16216') return 'rocket';
+  if (s === 'dbbl' || s === 'dutch-bangla') return 'rocket';
   if (s === 'upay' || s === '16268') return 'upay';
   // Fallback: infer from the message body itself.
   if (/bkash/i.test(text)) return 'bkash';
   if (/nagad/i.test(text)) return 'nagad';
   if (/rocket/i.test(text)) return 'rocket';
+  if (/dbbl|dutch-bangla/i.test(text)) return 'rocket';
   if (/upay/i.test(text)) return 'upay';
   return null;
 }

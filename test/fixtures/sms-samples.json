@@ -105,5 +105,60 @@
       "amountPoisha": 9999,
       "senderNumber": "01677778888"
     }
+  },
+  {
+    "name": "Nagad TxnID + Tk. dot (v2.9.8, Siam-er live test)",
+    "sender": "Nagad",
+    "text": "You have received Tk. 10.00 from 01740707570. Fee Tk. 0.00. Your Nagad balance is Tk. 500.00. TxnID: 76A94ITR",
+    "expected": {
+      "method": "nagad",
+      "trxid": "76A94ITR",
+      "amountPoisha": 1000,
+      "senderNumber": "01740707570"
+    }
+  },
+  {
+    "name": "Nagad Cash In, Txn ID with space (v2.9.8)",
+    "sender": "16167",
+    "text": "Cash In of Tk. 500.00 from 01898765432 is successful. Your Nagad balance is Tk. 2,500.00. Txn ID: NAGADTXN01",
+    "expected": {
+      "method": "nagad",
+      "trxid": "NAGADTXN01",
+      "amountPoisha": 50000,
+      "senderNumber": "01898765432"
+    }
+  },
+  {
+    "name": "Upay BDT amount (v2.9.8)",
+    "sender": "Upay",
+    "text": "You have received BDT 2,000.00 from 01933334444. Your Upay balance is BDT 4,500.00. TrxID: UPAYBDT123",
+    "expected": {
+      "method": "upay",
+      "trxid": "UPAYBDT123",
+      "amountPoisha": 200000,
+      "senderNumber": "01933334444"
+    }
+  },
+  {
+    "name": "Rocket TxnID, DBBL sender (v2.9.8)",
+    "sender": "DBBL",
+    "text": "Tk 750.00 has been received from 01722223333. Your Rocket balance is Tk 3,000.00. TxnID: ROCKETXN99",
+    "expected": {
+      "method": "rocket",
+      "trxid": "ROCKETXN99",
+      "amountPoisha": 75000,
+      "senderNumber": "01722223333"
+    }
+  },
+  {
+    "name": "bKash whole taka, no decimals (v2.9.8)",
+    "sender": "bKash",
+    "text": "You have received Tk 10 from 01712345678. TrxID: BKASHNOEX1",
+    "expected": {
+      "method": "bkash",
+      "trxid": "BKASHNOEX1",
+      "amountPoisha": 1000,
+      "senderNumber": "01712345678"
+    }
   }
 ]

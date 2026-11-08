@@ -305,6 +305,22 @@ test('bKash flow: ingest SMS -> verify -> confirm -> webhook; error cases', asyn
   assert.equal(badKey.status, 401);
 });
 
+test('v2.9.8: Nagad TxnID SMS auto-approves a pending order (like bKash)', async () => {
+  const order = await req('/api/me/orders', {
+    method: 'POST', token: basic.token,
+    body: { package: 'basic', trxid: 'NAGAD298A', sender: '01740707570', amount: 300 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  const ingest = await req('/api/sms', {
+    method: 'POST', appKey: basic.appKey,
+    body: { sender: 'Nagad', text: 'You have received Tk. 300.00 from 01740707570. Fee Tk. 0.00. Your Nagad balance is Tk. 500.00. TxnID: NAGAD298A' },
+  });
+  assert.equal(ingest.status, 200, JSON.stringify(ingest.json));
+  assert.equal(ingest.json.method, 'nagad');
+  assert.equal(ingest.json.amount, 300);
+  assert.equal(ingest.json.autoApproved, true);
+});
+
 test('Rocket flow: ingest -> verify -> confirm -> webhook', async () => {
   const ingest = await req('/api/sms', {
     method: 'POST', appKey: premium.appKey,
@@ -441,10 +457,10 @@ test('v2.2: keys + downloads locked until activation, issued on approve', async 
   assert.ok(apiKey.json.apiKey.startsWith('sk_live_'));
   // Downloads now work.
   assert.equal((await req('/download/app.apk', { token })).status, 200);
-  // v2.9.7: the served APK is v1.6 (TakaTick logo launcher icon).
+  // v2.9.8: the served APK is v1.7 (Nagad/Rocket/Upay SMS fix in the app).
   const dl = await fetch(base + '/download/app.apk', { headers: { Authorization: 'Bearer ' + token } });
   assert.equal(dl.status, 200);
-  assert.match(dl.headers.get('content-disposition') || '', /TakaTickSMS-v1\.6\.apk/);
+  assert.match(dl.headers.get('content-disposition') || '', /TakaTickSMS-v1\.7\.apk/);
   assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip', { token })).status, 200);
 });
 
