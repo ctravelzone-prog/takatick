@@ -659,7 +659,7 @@ app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
   return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
 });
 
-// APK download (single source: android-app/TakaTickSMS-v1.4.apk).
+// APK download (single source: android-app/TakaTickSMS-v1.5.apk).
 // v2.2: active merchants only — a pending merchant must not get the app
 // before paying. The dashboard fetches it with its JWT (blob download).
 app.get('/download/app.apk', auth, (req, res) => {
@@ -667,9 +667,9 @@ app.get('/download/app.apk', auth, (req, res) => {
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   const blocked = merchantBlocked(merchant);
   if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
-  const apkPath = path.join(__dirname, 'android-app', 'TakaTickSMS-v1.4.apk');
+  const apkPath = path.join(__dirname, 'android-app', 'TakaTickSMS-v1.5.apk');
   if (!fs.existsSync(apkPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  return res.download(apkPath, 'TakaTickSMS-v1.4.apk');
+  return res.download(apkPath, 'TakaTickSMS-v1.5.apk');
 });
 
 // ---------- public routes ----------
