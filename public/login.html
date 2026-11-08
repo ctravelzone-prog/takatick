@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Login — {{BRAND}}</title>
+<title>Log in — TakaTick</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <style>
 body{font-family:system-ui,sans-serif;max-width:420px;margin:40px auto;padding:20px;background:#f7f7f7;color:#222}
@@ -23,15 +23,7 @@ button{width:100%;padding:11px;border:0;border-radius:8px;background:#111;color:
 <label>Password</label><input name="password" type="password" required>
 <button type="submit">Log in</button>
 </form>
-<hr>
-<h3>Sign up</h3>
-<form id="signupForm">
-<label>Name</label><input name="name" required>
-<label>Email</label><input name="email" type="email" required>
-<label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
-<button type="submit">Create account</button>
-</form>
-<p class="muted">On signup your account is pending — pay by bKash and submit the TrxID from the home page; admin approves and your package activates for 30 days.</p>
+<p class="muted">Don't have an account? <a href="/signup.html">Sign up</a></p>
 <p class="muted"><a href="/">← Back to TakaTick website</a> · <a href="/#pricing">See packages &amp; buy</a> · <a href="/admin.html">Admin</a></p>
 </div>
 <script>
@@ -47,17 +39,6 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
   const f = new FormData(e.target);
   const o = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
   if(o.ok){ localStorage.setItem('token', o.token); location.href='/dashboard.html'; } else show(o);
-});
-document.getElementById('signupForm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password')});
-  if(o.ok){
-    alert('Account created!\nAPI key: '+o.apiKey+'\nApp key: '+o.appKey+'\nPay key: '+o.payKey+'\nWebhook secret: '+o.webhookSecret+'\n\nSave these now — they are shown once.');
-    const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
-    if(login.ok){ localStorage.setItem('token', login.token); location.href='/#pricing'; }
-    else { msg.textContent = 'Account created. Please log in above.'; }
-  } else show(o);
 });
 </script>
 </body>

@@ -533,10 +533,27 @@ test('landing + login pages: logged-in nav hooks present', async () => {
   assert.match(enroll.text, /id="enrollTitle"/);
   const login = await req('/login.html');
   assert.match(login.text, /location\.href='\/dashboard\.html'/);
-  assert.match(login.text, /location\.href='\/\#pricing'/);
+  // v2.3: signup moved to its own page — login has no signup form, and the
+  // post-signup redirect to #pricing lives on /signup.html now.
+  assert.doesNotMatch(login.text, /id="signupForm"/);
+  assert.doesNotMatch(login.text, /Create account/);
+  assert.match(login.text, /href="\/signup\.html"/);
+  const signup = await req('/signup.html');
+  assert.equal(signup.status, 200);
+  assert.match(signup.text, /id="signupForm"/);
+  assert.match(signup.text, /Create account/);
+  assert.match(signup.text, /location\.href='\/\#pricing'/);
+  assert.match(signup.text, /href="\/login\.html"/);
   // Standard flow: account creation asks for name/email/password only —
   // no plan/price selection at signup (plan is chosen in the wizard).
-  assert.doesNotMatch(login.text, /name="package"/);
+  assert.doesNotMatch(signup.text, /name="package"/);
+});
+
+test('v2.3: header + hero Sign up go to the signup page, not to pricing', async () => {
+  const home = await req('/');
+  assert.match(home.text, /href="\/signup\.html">Sign up<\/a>/);
+  assert.match(home.text, /id="heroSignup"[^>]*href="\/signup\.html"|href="\/signup\.html" id="heroSignup"/);
+  assert.match(home.text, /href="#pricing">See pricing<\/a>/);
 });
 
 test('signup step asks no plan: no package dropdown, selected plan shown as text', async () => {
