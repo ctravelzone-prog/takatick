@@ -12,6 +12,8 @@ import android.util.Log;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Inbox safety net (v1.4): broadcast receiver kono karone payment SMS
@@ -36,20 +38,36 @@ public final class InboxScanner {
     private static final String PREFS = "takatick";
     private static final String KEY_FORWARDED = "inbox_forwarded_trxids";
     private static final int MAX_TRACKED = 500;
+    private static final Pattern AMOUNT_PATTERN =
+            Pattern.compile("tk\\s*([\\d,]+\\.\\d{2})", Pattern.CASE_INSENSITIVE);
 
     private InboxScanner() {}
 
-    /** App khulle / Save-er por background thread theke dakte hoy. */
-    public static void scanAndForward(Context context) {
+    /** Notification-er jonno display text, jemon "Tk 20.00 (DK898LPEWJ)". */
+    private static String paymentDisplayText(String body, String trxid) {
+        Matcher m = AMOUNT_PATTERN.matcher(body);
+        if (m.find()) {
+            return "Tk " + m.group(1).replace(",", "") + " (" + trxid + ")";
+        }
+        return trxid;
+    }
+
+    /**
+     * App khulle / Save-er por / live scan theke background thread theke dakte hoy.
+     * Return: ei scan-e notun forward kora SORBOSHESH (notun) payment-er
+     * display text ("Tk 20.00 (DK898LPEWJ)"), ba kichu notun na thakle null.
+     * Scan date DESC-e chole, tai prothom forward-ta-i notun payment.
+     */
+    public static String scanAndForward(Context context) {
         if (context.checkSelfPermission(Manifest.permission.READ_SMS)
                 != PackageManager.PERMISSION_GRANTED) {
             Log.i(TAG, "READ_SMS nei — inbox scan skip");
-            return;
+            return null;
         }
         String[] settings = ApiClient.getSettings(context);
         if (settings[0].isEmpty() || settings[1].isEmpty()) {
             Log.i(TAG, "Server URL / appKey set kora hoyni — inbox scan skip");
-            return;
+            return null;
         }
         String baseUrl = settings[0];
         String appKey = settings[1];
@@ -58,6 +76,7 @@ public final class InboxScanner {
         Set<String> forwarded = new HashSet<>(prefs.getStringSet(KEY_FORWARDED, new HashSet<>()));
         boolean changed = false;
         int forwardedNow = 0;
+        String lastForwarded = null;
 
         Uri uri = Telephony.Sms.Inbox.CONTENT_URI;
         String[] projection = new String[]{"address", "body", "date"};
@@ -70,7 +89,7 @@ public final class InboxScanner {
                 uri, projection, selection, selectionArgs, sortOrder)) {
             if (cursor == null) {
                 Log.w(TAG, "Inbox query null — scan bondho");
-                return;
+                return null;
             }
             int addressIdx = cursor.getColumnIndex("address");
             int bodyIdx = cursor.getColumnIndex("body");
@@ -99,6 +118,9 @@ public final class InboxScanner {
                     forwarded.add(trxid);
                     forwardedNow++;
                     changed = true;
+                    if (lastForwarded == null) {
+                        lastForwarded = paymentDisplayText(body, trxid);
+                    }
                     if (forwarded.size() > MAX_TRACKED) {
                         forwarded.clear();
                         forwarded.add(trxid);
@@ -107,12 +129,13 @@ public final class InboxScanner {
             }
         } catch (Exception e) {
             Log.e(TAG, "Inbox scan failed", e);
-            return;
+            return null;
         }
 
         if (changed) {
             prefs.edit().putStringSet(KEY_FORWARDED, forwarded).apply();
         }
         Log.i(TAG, "Inbox scan sesh — notun forward: " + forwardedNow);
+        return lastForwarded;
     }
 }

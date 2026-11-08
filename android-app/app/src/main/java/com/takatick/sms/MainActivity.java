@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.EditText;
@@ -43,7 +44,7 @@ public class MainActivity extends Activity {
         boolean readGranted = checkSelfPermission(Manifest.permission.READ_SMS)
                 == PackageManager.PERMISSION_GRANTED;
         if (recvGranted && readGranted) {
-            statusText.setText("Status: SMS permission deoa ache ✅ (inbox scan-o chalu)");
+            statusText.setText("Status: SMS permission deoa ache ✅ (live scan 2s + inbox scan chalu)");
             return;
         }
         boolean askedBefore = getSharedPreferences("takatick", MODE_PRIVATE)
@@ -83,9 +84,10 @@ public class MainActivity extends Activity {
             }
         }
         if (recvGranted && readGranted) {
-            statusText.setText("Status: SMS permission deoa ache ✅ (inbox scan-o chalu)");
+            statusText.setText("Status: SMS permission deoa ache ✅ (live scan 2s + inbox scan chalu)");
             Toast.makeText(this, "SMS permission deoa hoyeche ✅", Toast.LENGTH_SHORT).show();
             runInboxScan();
+            startScanService();
         } else if (recvGranted) {
             statusText.setText("Status: SMS forward chalu ✅ — inbox scan-er jonno READ_SMS deoa hoy ni (miss kora SMS app khulle asbe na)");
         } else {
@@ -93,10 +95,71 @@ public class MainActivity extends Activity {
         }
     }
 
+    // Live scan service (v1.5): foreground service + proti 2s inbox scan.
+    // Setup save kora thaklei start hoy. AndroidX nei — framework-er
+    // Context.startForegroundService (API 26+) use kora hoyeche.
+    // Start fail holeo app cholbe — broadcast receiver ar khulle inbox
+    // scan backup hisebe ache.
+    private void startScanService() {
+        String[] settings = ApiClient.getSettings(this);
+        if (settings[0].isEmpty() || settings[1].isEmpty()) {
+            return;
+        }
+        try {
+            startForegroundService(new Intent(this, ScanService.class));
+        } catch (Exception e) {
+            // Foreground service start holo na — chupchap cholbe.
+        }
+    }
+
     // Inbox safety net: app khulle / Save-er por miss kora payment SMS
     // khuje server-e pathano. Permission na thakle scanner nijei skip kore.
     private void runInboxScan() {
         new Thread(() -> InboxScanner.scanAndForward(this)).start();
+    }
+
+    // Battery whitelist (v1.5): recents theke kete dileo / phone idle
+    // thakleo foreground service chalu rakhte system-ke bola hoy
+    // app-tar battery optimization bondho rakhte. Button chaple system
+    // dialog khole ("Let app always run in background?" — Allow);
+    // kono phone-e ei intent na thakle App info khole, okhane
+    // Battery → Unrestricted korte hoy.
+    private void requestBatteryWhitelist() {
+        Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        i.setData(Uri.parse("package:" + getPackageName()));
+        if (i.resolveActivity(getPackageManager()) == null) {
+            i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            i.setData(Uri.parse("package:" + getPackageName()));
+        }
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            Toast.makeText(this, "Settings khola jayni — manually Apps → TakaTick SMS → Battery → Unrestricted koro", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private boolean isBatteryExempt() {
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    // Status line-er sheshe background state dekhano. Purono suffix
+    // (thakle) age kete notun-ta bosano hoy — bar bar onResume holeo
+    // ekbar-i thake.
+    private void refreshBackgroundStatus() {
+        if (statusText == null) return;
+        String cur = statusText.getText().toString();
+        int idx = cur.indexOf(" • Background");
+        if (idx >= 0) cur = cur.substring(0, idx);
+        statusText.setText(cur + (isBatteryExempt()
+                ? " • Background chalu ✅"
+                : " • Background off — 'BACKGROUND CHALU RAKHO' button ta chap diye chalu koro"));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshBackgroundStatus();
     }
 
     @Override
@@ -126,6 +189,9 @@ public class MainActivity extends Activity {
         Button testBtn = new Button(this);
         testBtn.setText("Test SMS pathan");
 
+        Button bgBtn = new Button(this);
+        bgBtn.setText("BACKGROUND CHALU RAKHO");
+
         statusText = new TextView(this);
         statusText.setText("Status: setup baki");
 
@@ -145,9 +211,12 @@ public class MainActivity extends Activity {
             statusText.setText("Status: save hoyeche");
             Toast.makeText(this, "Save hoyeche", Toast.LENGTH_SHORT).show();
             runInboxScan();
+            startScanService();
         });
 
         permBtn.setOnClickListener(v -> requestSmsPermission());
+
+        bgBtn.setOnClickListener(v -> requestBatteryWhitelist());
 
         testBtn.setOnClickListener(v -> {
             String[] settings = ApiClient.getSettings(this);
@@ -175,12 +244,16 @@ public class MainActivity extends Activity {
         layout.addView(saveBtn);
         layout.addView(permBtn);
         layout.addView(testBtn);
+        layout.addView(bgBtn);
         layout.addView(statusText);
         setContentView(layout);
 
         // Kholar somoy permission na thakle chaowa — ar permission thakle
         // inbox safety net: miss kora payment SMS khuje pathano.
+        // Setup thakle live scan service-o chalu hoy (foreground, 2s scan).
         requestSmsPermission();
         runInboxScan();
+        startScanService();
+        refreshBackgroundStatus();
     }
 }

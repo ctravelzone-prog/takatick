@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.takatick.sms"
-    android:versionCode="5"
-    android:versionName="1.4">
+    android:versionCode="6"
+    android:versionName="1.5">
 
     <!-- SMS porte ar server-e pathate ei permission gulo lage.
          RECEIVE_SMS — live broadcast theke payment SMS dhora (primary,
@@ -17,6 +17,21 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- v1.5 live scan: foreground service (proti 2s inbox check) +
+         phone restart-er por service abar chalu kora. Foreground service
+         thakle Android process-ta background-e mere fele na — tai SMS
+         broadcast-o thik moto deliver hoy. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- v1.5 battery whitelist: "BACKGROUND CHALU RAKHO" button diye
+         system-ke bola hoy app-tar battery optimization bondho rakhte,
+         jate recents theke kete dileo / phone idle thakleo foreground
+         service-ta chalu thake. Permission-ta sudhu ei request-er
+         jonno — user na chaile kichu hoy na. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
 
@@ -40,6 +55,22 @@
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="999">
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- v1.5 live scan service: foreground (dataSync), proti 2s inbox
+             check kore. Wake lock nei — service process jibito rakhe. -->
+        <service
+            android:name=".ScanService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Phone restart-er por live scan abar chalu kore. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>
