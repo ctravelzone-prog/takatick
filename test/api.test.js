@@ -437,3 +437,45 @@ test('v2.2.1: dashboard static HTML hides key buttons + download links by defaul
   assert.doesNotMatch(dash.text, /sk_live_/);
   assert.doesNotMatch(dash.text, /pay_[0-9a-f]{16,}/);
 });
+
+test('v2.2.2: webhook secret gated until activation, masked in profile, revealed on demand', async () => {
+  const r = await req('/api/auth/signup', {
+    method: 'POST',
+    body: { name: 'Secret Test', email: 'secret@takatick.test', password: 'password123', package: 'basic' },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.json));
+  const login = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'secret@takatick.test', password: 'password123' },
+  });
+  const token = login.json.token;
+  // Pending: profile shows no masked secret, endpoint is 403.
+  const prof = await req('/api/me/profile', { token });
+  assert.equal(prof.json.webhookSecretMasked, null);
+  const blocked = await req('/api/me/webhook-secret', { token });
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.json.error, 'PACKAGE_NOT_ACTIVE');
+  // Approve the order.
+  const order = await req('/api/me/orders', {
+    method: 'POST', token,
+    body: { package: 'basic', trxid: 'SECRET0001', sender: '01712345678', amount: 300 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  const tok = await adminToken();
+  const approve = await req(`/api/admin/orders/${order.json.order.id}/approve`, {
+    method: 'POST', token: tok, body: {},
+  });
+  assert.equal(approve.status, 200, JSON.stringify(approve.json));
+  // Active: masked in profile, full 64-hex value on demand, mask matches.
+  const prof2 = await req('/api/me/profile', { token });
+  assert.ok(prof2.json.webhookSecretMasked);
+  assert.match(prof2.json.webhookSecretMasked, /^[0-9a-f]{8}\.\.\.[0-9a-f]{4}$/);
+  const sec = await req('/api/me/webhook-secret', { token });
+  assert.equal(sec.status, 200);
+  assert.match(sec.json.webhookSecret, /^[0-9a-f]{64}$/);
+  assert.ok(prof2.json.webhookSecretMasked.startsWith(sec.json.webhookSecret.slice(0, 8)));
+  assert.ok(prof2.json.webhookSecretMasked.endsWith(sec.json.webhookSecret.slice(-4)));
+  // Dashboard offers the reveal button.
+  const dash = await req('/dashboard.html');
+  assert.match(dash.text, /Show webhook secret/);
+});

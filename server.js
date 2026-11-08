@@ -723,6 +723,10 @@ app.get('/api/me/profile', auth, (req, res) => {
     .get(merchant.id);
   const used = verificationsUsedThisMonth(merchant.id);
   const exp = expiryState(merchant);
+  // v2.2.2: the webhook secret is generated at signup, but its masked form
+  // must not leak to a blocked (pending/expired) merchant — same rule as
+  // the other keys: nothing key-like before activation.
+  const blocked = merchantBlocked(merchant);
   return res.json({
     ok: true,
     merchant: publicMerchant(merchant),
@@ -734,6 +738,7 @@ app.get('/api/me/profile', auth, (req, res) => {
     graceDays: getGraceDays(),
     apiKeyMasked: maskKey(apiRow?.key),
     appKeyMasked: maskKey(appRow?.key),
+    webhookSecretMasked: blocked ? null : maskKey(merchant.webhook_secret),
     usage: {
       verificationsUsedThisMonth: used,
       verificationsLimit: pkg.verificationsPerMonth,
@@ -780,6 +785,17 @@ app.get('/api/me/app-key', auth, (req, res) => {
     .get(req.merchantId);
   if (!row) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   return res.json({ ok: true, appKey: row.key });
+});
+
+// v2.2.2: webhook secret on demand — masked in profile, full value only here.
+// Same gate as the other key endpoints: pending/expired merchants get 403.
+app.get('/api/me/webhook-secret', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  if (!merchant.webhook_secret) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.json({ ok: true, webhookSecret: merchant.webhook_secret });
 });
 
 // Numbers
