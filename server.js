@@ -74,6 +74,19 @@ app.get('/', (_req, res) => {
 });
 app.get('/pricing.html', (_req, res) => res.redirect('/#pricing'));
 
+// WooCommerce plugin zip (v2.2): gated like the APK — active merchants
+// only. MUST be defined BEFORE express.static, which would otherwise
+// serve public/downloads/ to anyone without an account.
+app.get('/downloads/takatick-woocommerce-plugin.zip', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const zipPath = path.join(__dirname, 'public', 'downloads', 'takatick-woocommerce-plugin.zip');
+  if (!fs.existsSync(zipPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.download(zipPath, 'takatick-woocommerce-plugin.zip');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------
@@ -112,6 +125,42 @@ function getMerchantById(id) {
 
 function getActiveApiKeyRow(key) {
   return db.prepare('SELECT * FROM api_keys WHERE key = ? AND revoked = 0').get(key);
+}
+
+// v2.2: keys are issued ONLY on activation (admin approves an order or
+// activates the merchant) — never at signup. Signup stores a 'pending_'
+// placeholder pay_key (the column is NOT NULL, so it cannot be empty);
+// activation replaces it with a real 'pay_' key and creates the API +
+// app keys. Merchants that already have keys are left untouched, so
+// renewal/reactivation reuses the same keys.
+function ensureMerchantKeys(merchantId) {
+  const merchant = getMerchantById(merchantId);
+  if (!merchant) return { issued: false };
+  let issued = false;
+  if (!merchant.pay_key || String(merchant.pay_key).startsWith('pending_')) {
+    const payKey = 'pay_' + crypto.randomBytes(16).toString('hex');
+    const webhookSecret = crypto.randomBytes(32).toString('hex');
+    db.prepare('UPDATE merchants SET pay_key = ?, webhook_secret = ? WHERE id = ?')
+      .run(payKey, webhookSecret, merchantId);
+    issued = true;
+  }
+  const apiRow = db.prepare(
+    'SELECT id FROM api_keys WHERE merchant_id = ? AND revoked = 0'
+  ).get(merchantId);
+  if (!apiRow) {
+    const apiKey = 'sk_live_' + crypto.randomBytes(24).toString('hex');
+    db.prepare('INSERT INTO api_keys (merchant_id, key, label, created_at) VALUES (?, ?, ?, ?)')
+      .run(merchantId, apiKey, 'default', nowIso());
+    issued = true;
+  }
+  const appRow = db.prepare('SELECT id FROM app_keys WHERE merchant_id = ?').get(merchantId);
+  if (!appRow) {
+    const appKey = 'app_' + crypto.randomBytes(24).toString('hex');
+    db.prepare('INSERT INTO app_keys (merchant_id, key, created_at) VALUES (?, ?, ?)')
+      .run(merchantId, appKey, nowIso());
+    issued = true;
+  }
+  return { issued };
 }
 
 function verificationsUsedThisMonth(merchantId) {
@@ -538,8 +587,10 @@ app.post('/api/admin/orders/:id/approve', adminAuth, (req, res) => {
     .run(decidedAt, String(req.adminId), order.id);
   db.prepare("UPDATE merchants SET package = ?, package_expires_at = ?, status = 'active' WHERE id = ?")
     .run(order.package, expiresAt, merchant.id);
+  // v2.2: approval issues the keys — first time the merchant ever sees them.
+  const keys = ensureMerchantKeys(merchant.id);
   const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
-  return res.json({ ok: true, order: updated, merchant: publicMerchant(getMerchantById(merchant.id)) });
+  return res.json({ ok: true, order: updated, merchant: publicMerchant(getMerchantById(merchant.id)), keysIssued: keys.issued });
 });
 
 app.post('/api/admin/orders/:id/reject', adminAuth, (req, res) => {
@@ -562,7 +613,9 @@ app.post('/api/admin/merchants/:id/package', adminAuth, (req, res) => {
   const expiresAt = new Date(Date.now() + PACKAGE_DAYS * DAY_MS).toISOString();
   db.prepare("UPDATE merchants SET package = ?, package_expires_at = ?, status = 'active' WHERE id = ?")
     .run(pkgId, expiresAt, merchant.id);
-  return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
+  // v2.2: activation issues the keys if this merchant never had any.
+  const keys = ensureMerchantKeys(merchant.id);
+  return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)), keysIssued: keys.issued });
 });
 
 app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
@@ -573,11 +626,20 @@ app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
   const merchant = getMerchantById(req.params.id);
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   db.prepare('UPDATE merchants SET status = ? WHERE id = ?').run(status, merchant.id);
+  // v2.2: flipping a never-activated merchant straight to active also
+  // issues their keys; reactivation reuses existing keys.
+  if (status === 'active') ensureMerchantKeys(merchant.id);
   return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
 });
 
 // APK download (single source: android-app/TakaTickSMS-v1.0.apk).
-app.get('/download/app.apk', (_req, res) => {
+// v2.2: active merchants only — a pending merchant must not get the app
+// before paying. The dashboard fetches it with its JWT (blob download).
+app.get('/download/app.apk', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
   const apkPath = path.join(__dirname, 'android-app', 'TakaTickSMS-v1.0.apk');
   if (!fs.existsSync(apkPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   return res.download(apkPath, 'TakaTickSMS-v1.0.apk');
@@ -606,10 +668,12 @@ app.post('/api/auth/signup', (req, res) => {
   if (existing) return res.status(409).json({ ok: false, error: 'EMAIL_EXISTS' });
 
   const passwordHash = bcrypt.hashSync(String(password), 10);
+  // v2.2: NO usable keys at signup — pay_key is a 'pending_' placeholder
+  // (the column is NOT NULL) and no api/app key rows are created. Real
+  // keys are issued only on activation (ensureMerchantKeys), i.e. after
+  // the admin approves the package order.
+  const payKey = 'pending_' + crypto.randomBytes(16).toString('hex');
   const webhookSecret = crypto.randomBytes(32).toString('hex');
-  const payKey = 'pay_' + crypto.randomBytes(16).toString('hex');
-  const apiKey = 'sk_live_' + crypto.randomBytes(24).toString('hex');
-  const appKey = 'app_' + crypto.randomBytes(24).toString('hex');
   const createdAt = nowIso();
   // New accounts start PENDING — no package access until an order is
   // approved by the admin (approval sets status='active' + expiry =
@@ -624,18 +688,10 @@ app.post('/api/auth/signup', (req, res) => {
        VALUES (?, ?, ?, ?, NULL, 'pending', ?, ?, ?)`
     ).run(name.trim(), String(email).toLowerCase(), passwordHash, pkg, webhookSecret, payKey, createdAt);
     const merchantId = info.lastInsertRowid;
-    db.prepare('INSERT INTO api_keys (merchant_id, key, label, created_at) VALUES (?, ?, ?, ?)')
-      .run(merchantId, apiKey, 'default', createdAt);
-    db.prepare('INSERT INTO app_keys (merchant_id, key, created_at) VALUES (?, ?, ?)')
-      .run(merchantId, appKey, createdAt);
     const merchant = getMerchantById(merchantId);
     return res.status(201).json({
       ok: true,
       merchant: publicMerchant(merchant),
-      apiKey,
-      appKey,
-      payKey,
-      webhookSecret,
     });
   } catch (e) {
     return res.status(500).json({ ok: false, error: 'SIGNUP_FAILED' });
@@ -688,6 +744,9 @@ app.get('/api/me/profile', auth, (req, res) => {
 app.post('/api/me/api-key/regenerate', auth, (req, res) => {
   const merchant = getMerchantById(req.merchantId);
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  // v2.2: pending/expired merchants have no usable key to regenerate.
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
   if (blockIfPlanOff(merchant, res)) return;
   db.prepare('UPDATE api_keys SET revoked = 1 WHERE merchant_id = ? AND revoked = 0')
     .run(merchant.id);
@@ -697,7 +756,26 @@ app.post('/api/me/api-key/regenerate', auth, (req, res) => {
   return res.json({ ok: true, apiKey });
 });
 
+// v2.2: reveal the full API key (dashboard "Show API key") — active
+// merchants only; pending merchants have no key yet.
+app.get('/api/me/api-key', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const row = db.prepare(
+    'SELECT key FROM api_keys WHERE merchant_id = ? AND revoked = 0 ORDER BY id DESC LIMIT 1'
+  ).get(req.merchantId);
+  if (!row) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.json({ ok: true, apiKey: row.key });
+});
+
 app.get('/api/me/app-key', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  // v2.2: pending/expired merchants have no app key yet.
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
   const row = db.prepare('SELECT key FROM app_keys WHERE merchant_id = ? ORDER BY id DESC LIMIT 1')
     .get(req.merchantId);
   if (!row) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });

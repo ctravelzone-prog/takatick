@@ -53,9 +53,9 @@ async function signup(name, email, pkg) {
   });
   assert.equal(r.status, 201, `signup ${email}: ${JSON.stringify(r.json)}`);
   assert.equal(r.json.ok, true);
-  assert.ok(r.json.apiKey.startsWith('sk_live_'));
-  assert.ok(r.json.appKey.startsWith('app_'));
-  assert.ok(r.json.payKey.startsWith('pay_'));
+  // v2.2: signup issues NO keys — they come only on activation.
+  assert.ok(!('apiKey' in r.json) && !('appKey' in r.json) && !('payKey' in r.json));
+  assert.equal(r.json.merchant.pay_key.startsWith('pending_'), true);
   const login = await req('/api/auth/login', {
     method: 'POST',
     body: { email, password: 'password123' },
@@ -65,7 +65,23 @@ async function signup(name, email, pkg) {
   // v1.5: signups are pending — activate via order + admin approval,
   // exactly like a real merchant, before using verify/pay-page.
   await activate(login.json.token, pkg);
-  return { ...r.json, token: login.json.token };
+  // v2.2: keys are issued on approval — fetch them now.
+  const keys = await fetchKeys(login.json.token);
+  return { ...r.json, ...keys, token: login.json.token };
+}
+
+async function fetchKeys(token) {
+  const apiKeyRes = await req('/api/me/api-key', { token });
+  assert.equal(apiKeyRes.status, 200, `api-key: ${JSON.stringify(apiKeyRes.json)}`);
+  const appKeyRes = await req('/api/me/app-key', { token });
+  assert.equal(appKeyRes.status, 200, `app-key: ${JSON.stringify(appKeyRes.json)}`);
+  const profile = await req('/api/me/profile', { token });
+  assert.ok(profile.json.merchant.pay_key.startsWith('pay_'), `pay_key: ${profile.json.merchant.pay_key}`);
+  return {
+    apiKey: apiKeyRes.json.apiKey,
+    appKey: appKeyRes.json.appKey,
+    payKey: profile.json.merchant.pay_key,
+  };
 }
 
 let adminTokenCache = null;
@@ -353,4 +369,59 @@ test('Upay pay-page claim confirms payment', async () => {
   const gotWebhook = await waitFor(() =>
     deliveries.some((d) => d.body && d.body.transactionId === 'UPAY987654'));
   assert.equal(gotWebhook, true, 'webhook for UPAY987654 not received');
+});
+
+test('v2.2: keys + downloads locked until activation, issued on approve', async () => {
+  const r = await req('/api/auth/signup', {
+    method: 'POST',
+    body: { name: 'Lock Test', email: 'lock@takatick.test', password: 'password123', package: 'basic' },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.json));
+  assert.ok(!('apiKey' in r.json) && !('appKey' in r.json) && !('payKey' in r.json));
+  const login = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'lock@takatick.test', password: 'password123' },
+  });
+  const token = login.json.token;
+  const prof = await req('/api/me/profile', { token });
+  assert.equal(prof.json.apiKeyMasked, null);
+  assert.equal(prof.json.merchant.pay_key.startsWith('pending_'), true);
+  // Key endpoints blocked while pending.
+  for (const p of ['/api/me/app-key', '/api/me/api-key']) {
+    const x = await req(p, { token });
+    assert.equal(x.status, 403, p);
+    assert.equal(x.json.error, 'PACKAGE_NOT_ACTIVE');
+  }
+  const regen = await req('/api/me/api-key/regenerate', { method: 'POST', token, body: {} });
+  assert.equal(regen.status, 403);
+  assert.equal(regen.json.error, 'PACKAGE_NOT_ACTIVE');
+  // Downloads blocked: no token 401, pending token 403.
+  assert.equal((await req('/download/app.apk')).status, 401);
+  assert.equal((await req('/download/app.apk', { token })).status, 403);
+  assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip', { token })).status, 403);
+  assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip')).status, 401);
+  // Approve issues the keys.
+  const order = await req('/api/me/orders', {
+    method: 'POST', token,
+    body: { package: 'basic', trxid: 'LOCK000001', sender: '01712345678', amount: 300 },
+  });
+  assert.equal(order.status, 201, JSON.stringify(order.json));
+  const tok = await adminToken();
+  const approve = await req(`/api/admin/orders/${order.json.order.id}/approve`, {
+    method: 'POST', token: tok, body: {},
+  });
+  assert.equal(approve.status, 200, JSON.stringify(approve.json));
+  assert.equal(approve.json.keysIssued, true);
+  const prof2 = await req('/api/me/profile', { token });
+  assert.ok(prof2.json.apiKeyMasked);
+  assert.ok(prof2.json.merchant.pay_key.startsWith('pay_'));
+  const appKey = await req('/api/me/app-key', { token });
+  assert.equal(appKey.status, 200);
+  assert.ok(appKey.json.appKey.startsWith('app_'));
+  const apiKey = await req('/api/me/api-key', { token });
+  assert.equal(apiKey.status, 200);
+  assert.ok(apiKey.json.apiKey.startsWith('sk_live_'));
+  // Downloads now work.
+  assert.equal((await req('/download/app.apk', { token })).status, 200);
+  assert.equal((await req('/downloads/takatick-woocommerce-plugin.zip', { token })).status, 200);
 });

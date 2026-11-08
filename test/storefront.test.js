@@ -42,12 +42,30 @@ async function signup(name, email, pkg) {
     body: { name, email, password: 'password123', package: pkg },
   });
   assert.equal(r.status, 201, `signup ${email}: ${JSON.stringify(r.json)}`);
+  // v2.2: signup issues NO keys — they come only on activation.
+  assert.ok(!('apiKey' in r.json) && !('appKey' in r.json) && !('payKey' in r.json));
+  assert.equal(r.json.merchant.pay_key.startsWith('pending_'), true);
   const login = await req('/api/auth/login', {
     method: 'POST',
     body: { email, password: 'password123' },
   });
   assert.equal(login.json.ok, true);
   return { ...r.json, token: login.json.token };
+}
+
+// v2.2: fetch the keys issued on activation (API key, app key, pay key).
+async function fetchKeys(token) {
+  const apiKeyRes = await req('/api/me/api-key', { token });
+  assert.equal(apiKeyRes.status, 200, `api-key: ${JSON.stringify(apiKeyRes.json)}`);
+  const appKeyRes = await req('/api/me/app-key', { token });
+  assert.equal(appKeyRes.status, 200, `app-key: ${JSON.stringify(appKeyRes.json)}`);
+  const profile = await req('/api/me/profile', { token });
+  assert.ok(profile.json.merchant.pay_key.startsWith('pay_'), `pay_key: ${profile.json.merchant.pay_key}`);
+  return {
+    apiKey: apiKeyRes.json.apiKey,
+    appKey: appKeyRes.json.appKey,
+    payKey: profile.json.merchant.pay_key,
+  };
 }
 
 async function adminLogin(password = ADMIN_PASSWORD) {
@@ -247,6 +265,7 @@ let expiryMerchant;
 test('expiry: 4 days past expiry -> verify 403 PACKAGE_EXPIRED + pay page blocked', async () => {
   expiryMerchant = await signup('Expiry Merchant', 'expiry@takatick.test', 'premium');
   await activateMerchant(expiryMerchant.token, 'premium', 'EXPIRE-ACT-1');
+  Object.assign(expiryMerchant, await fetchKeys(expiryMerchant.token));
   const ingest = await req('/api/sms', {
     method: 'POST', appKey: expiryMerchant.appKey,
     body: { sender: 'bKash', text: 'You have received Tk 1,000.00 from 01712345678. TrxID: EXPIRE0001. Thank you.' },
@@ -434,33 +453,46 @@ test('signup is pending: no service until admin approves (Siam bug report)', asy
   const profile = await req('/api/me/profile', { token: m.token });
   assert.equal(profile.json.expiryState, 'pending');
   assert.equal(profile.json.packageExpiresAt, null);
+  // v2.2: no keys at all while pending — nothing to use.
+  assert.equal(profile.json.apiKeyMasked, null);
+  assert.equal(profile.json.merchant.pay_key.startsWith('pending_'), true);
+  const appKey = await req('/api/me/app-key', { token: m.token });
+  assert.equal(appKey.status, 403);
+  assert.equal(appKey.json.error, 'PACKAGE_NOT_ACTIVE');
 
-  // SMS ingest stores the transaction, but verify is blocked while pending.
-  await req('/api/sms', {
-    method: 'POST', appKey: m.appKey,
+  // SMS ingest without an app key is rejected.
+  const ingest = await req('/api/sms', {
+    method: 'POST',
     body: { sender: 'bKash', text: 'You have received Tk 1,000.00 from 01712345678. TrxID: PEND00001. Thank you.' },
   });
+  assert.equal(ingest.status, 401);
+
+  // Verify with an unknown key is rejected.
   const verify = await req('/api/v1/verify', {
     method: 'POST',
-    body: { apiKey: m.apiKey, amount: 1000, transactionId: 'PEND00001' },
+    body: { apiKey: 'invalid_api_key_123', amount: 1000, transactionId: 'PEND00001' },
   });
-  assert.equal(verify.status, 403);
-  assert.equal(verify.json.error, 'PACKAGE_NOT_ACTIVE');
+  assert.equal(verify.status, 401);
 
-  // Pay page blocked while pending.
-  const payPage = await req(`/pay/${m.payKey}?amount=1000`);
-  assert.equal(payPage.status, 403);
-  assert.match(payPage.text, /not active yet/i);
+  // Pay page with an unknown pay key is not found.
+  const payPage = await req('/pay/pay_00000000000000000000000000000000?amount=1000');
+  assert.equal(payPage.status, 404);
 
-  // Order + approve activates with a fresh 30 days.
+  // Order + approve activates with a fresh 30 days — and issues the keys.
   const before = Date.now();
   await activateMerchant(m.token, 'basic', 'PEND-ORDER-1');
   const after = await req('/api/me/profile', { token: m.token });
   assert.equal(after.json.expiryState, 'active');
   const deltaDays = (new Date(after.json.packageExpiresAt).getTime() - before) / (24 * 3600 * 1000);
   assert.ok(deltaDays > 29.9 && deltaDays < 30.1, `activation window days: ${deltaDays}`);
+  Object.assign(m, await fetchKeys(m.token));
 
-  // Now the earlier SMS verifies fine.
+  // Now SMS ingest + verify work with the issued keys.
+  const ingest2 = await req('/api/sms', {
+    method: 'POST', appKey: m.appKey,
+    body: { sender: 'bKash', text: 'You have received Tk 1,000.00 from 01712345678. TrxID: PEND00001. Thank you.' },
+  });
+  assert.equal(ingest2.status, 200, JSON.stringify(ingest2.json));
   const verify2 = await req('/api/v1/verify', {
     method: 'POST',
     body: { apiKey: m.apiKey, amount: 1000, transactionId: 'PEND00001' },
@@ -481,6 +513,11 @@ test('admin manual package change activates a pending merchant', async () => {
   assert.equal(profile.json.expiryState, 'active');
   const deltaDays = (new Date(profile.json.packageExpiresAt).getTime() - before) / (24 * 3600 * 1000);
   assert.ok(deltaDays > 29.9 && deltaDays < 30.1, `manual activation window days: ${deltaDays}`);
+  // v2.2: manual activation also issues the keys.
+  const keys = await fetchKeys(m.token);
+  assert.ok(keys.apiKey.startsWith('sk_live_'));
+  assert.ok(keys.appKey.startsWith('app_'));
+  assert.ok(keys.payKey.startsWith('pay_'));
 });
 
 test('landing + login pages: logged-in nav hooks present', async () => {
@@ -581,6 +618,7 @@ test('v1.8 master admin: merchant detail endpoint', async () => {
   });
   assert.equal(num.status, 201, JSON.stringify(num.json));
   await activateMerchant(masterMerchant.token, 'basic', 'MASTER-ORDER-1');
+  Object.assign(masterMerchant, await fetchKeys(masterMerchant.token));
 
   const d = await req(`/api/admin/merchants/${masterMerchant.merchant.id}`, { token: adminToken });
   assert.equal(d.status, 200, JSON.stringify(d.json));

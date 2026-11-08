@@ -51,14 +51,15 @@ code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere
 </div>
 <div class="card" id="pkgBanner" style="border-left:5px solid #111"><h2>Your package</h2><div id="pkgStatus">Loading…</div></div>
 <div class="card"><h2>Profile &amp; package</h2><div id="profile">Loading…</div></div>
-<div class="card"><h2>Downloads</h2>
-<p>📱 <a href="/download/app.apk">Download TakaTick SMS app (APK v1.0)</a> — install on the phone that receives payment SMS.<br>
-🛒 <a href="/downloads/takatick-woocommerce-plugin.zip">Download WooCommerce plugin (.zip)</a> — Premium only; setup guide in INTEGRATION.md.</p></div>
+<div class="card" id="dlCard"><h2>Downloads</h2>
+<div id="dlLinks"><p>📱 <a href="#" onclick="downloadFile('/download/app.apk','TakaTickSMS-v1.0.apk');return false">Download TakaTick SMS app (APK v1.0)</a> — install on the phone that receives payment SMS.<br>
+🛒 <a href="#" onclick="downloadFile('/downloads/takatick-woocommerce-plugin.zip','takatick-woocommerce-plugin.zip');return false">Download WooCommerce plugin (.zip)</a> — Premium only; setup guide in INTEGRATION.md.</p></div>
+<div id="dlLocked" style="display:none"><p>🔒 <strong>Locked</strong> — SMS app (APK) ar WooCommerce plugin download korte package active thakte hobe.</p></div></div>
 <div class="card"><h2>My package orders</h2><div id="orders">Loading…</div>
 <p><button onclick="location.href='/#pricing'">Upgrade / Renew package</button></p></div>
-<div class="card"><h2>Keys &amp; pay link</h2><div id="keys"></div>
-<p><button id="regenBtn" onclick="regenKey()">Regenerate API key</button> <button onclick="showAppKey()">Show app key</button></p>
-<div id="appkey"></div></div>
+<div class="card" id="keysCard"><h2>Keys &amp; pay link</h2><div id="keys"></div>
+<p id="keysBtns"><button id="regenBtn" onclick="regenKey()">Regenerate API key</button> <button onclick="showApiKey()">Show API key</button> <button onclick="showAppKey()">Show app key</button></p>
+<div id="appkey"></div><div id="apikey"></div></div>
 <div class="card"><h2>Payment numbers</h2>
 <form id="numForm"><select name="method"><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="upay">Upay</option></select>
 <input name="number" placeholder="01XXXXXXXXX" required><input name="label" placeholder="Label (optional)">
@@ -123,9 +124,21 @@ async function load(){
     banner = `<p><strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo) — Active<br>No expiry date.</p>`;
   }
   document.getElementById('pkgStatus').innerHTML = banner;
-  document.getElementById('keys').innerHTML =
-    `<p>API key: <code>${esc(p.apiKeyMasked||'')}</code><br>App key: <code>${esc(p.appKeyMasked||'')}</code><br>`+
-    `Pay link: <code>${esc(location.origin)}/pay/${esc(m.pay_key)}</code></p>`;
+  // v2.2: keys + downloads exist only after activation. A pending merchant
+  // (never approved) has no keys yet — show a locked box instead of the
+  // keys/links. (No active API key = never activated.)
+  const keysLocked = !p.apiKeyMasked;
+  document.getElementById('dlLinks').style.display = keysLocked ? 'none' : '';
+  document.getElementById('dlLocked').style.display = keysLocked ? '' : 'none';
+  document.getElementById('keysBtns').style.display = keysLocked ? 'none' : '';
+  if (keysLocked) {
+    document.getElementById('keys').innerHTML =
+      `<p>🔒 <strong>Locked</strong> — API key, app key ar pay link pabe jokhon admin tomar package approve korbe (payment-er pore).</p><button onclick="location.href='/#pricing'">Buy a package</button>`;
+  } else {
+    document.getElementById('keys').innerHTML =
+      `<p>API key: <code>${esc(p.apiKeyMasked||'')}</code><br>App key: <code>${esc(p.appKeyMasked||'')}</code><br>`+
+      `Pay link: <code>${esc(location.origin)}/pay/${esc(m.pay_key)}</code></p>`;
+  }
   document.querySelector('#settingsForm [name=webhook_url]').value = m.webhook_url||'';
   document.querySelector('#settingsForm [name=success_url]').value = m.success_url||'';
   document.querySelector('#settingsForm [name=fail_url]').value = m.fail_url||'';
@@ -160,6 +173,15 @@ function renderTxns(){
     rows.map(x=>`<tr><td>${esc(x.trxid)}</td><td>${esc(x.method)}</td><td>৳${(x.amount_poisha/100).toFixed(2)}</td><td>${esc(x.sender||'')}</td><td>${esc(x.status)}</td><td>${esc(x.received_at||'')}</td></tr>`).join('')+'</table>';
 }
 async function regenKey(){ const o = await api('/api/me/api-key/regenerate',{method:'POST',body:'{}'}); if(o.ok) alert('New API key: '+o.apiKey+'\nOld key revoked. Save it now.'); load(); }
+async function showApiKey(){ const o = await api('/api/me/api-key'); document.getElementById('apikey').textContent = o.ok ? ('API key: '+o.apiKey) : (o.error||'Failed'); }
+async function downloadFile(path, name){
+  const r = await fetch(path, {headers:{Authorization:'Bearer '+token}});
+  if(!r.ok){ alert('Download failed — package active thakte hobe.'); return; }
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
 async function showAppKey(){ const o = await api('/api/me/app-key'); document.getElementById('appkey').textContent = o.ok ? ('App key: '+o.appKey) : (o.error||'Failed'); }
 async function delNum(id){ await api('/api/me/numbers/'+id,{method:'DELETE'}); load(); }
 document.getElementById('numForm').addEventListener('submit', async e=>{ e.preventDefault(); const f=new FormData(e.target);
