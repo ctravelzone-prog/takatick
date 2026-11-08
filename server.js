@@ -133,6 +133,27 @@ app.get('/downloads/takatick-woocommerce-plugin.zip', auth, (req, res) => {
   return res.download(zipPath, 'takatick-woocommerce-plugin.zip');
 });
 
+// Next.js plug-and-play kit (2 files, raw-code sites): same gating as the
+// plugin zip — active merchants only. Single source: nextjs-kit/.
+app.get('/downloads/TakaTickPayButton.tsx', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const filePath = path.join(__dirname, 'nextjs-kit', 'TakaTickPayButton.tsx');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.download(filePath, 'TakaTickPayButton.tsx');
+});
+app.get('/downloads/takatick-webhook-route.ts', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const filePath = path.join(__dirname, 'nextjs-kit', 'takatick-webhook-route.ts');
+  if (!fs.existsSync(filePath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.download(filePath, 'takatick-webhook-route.ts');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- helpers ----------

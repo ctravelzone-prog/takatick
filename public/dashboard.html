@@ -36,6 +36,16 @@ td,th{border-bottom:1px solid #eee;padding:7px 6px;text-align:left;overflow-wrap
 code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
 #msg{color:#b00}
 .muted{color:var(--muted)}
+.dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.dl-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 2px 12px rgba(10,27,46,.05);display:flex;flex-direction:column}
+.dl-card h3{margin:0 0 8px;font-size:17px;font-family:'Space Grotesk',system-ui,sans-serif;color:var(--navy)}
+.dl-card p{margin:0 0 8px;font-size:14px}
+.dl-icon{font-size:28px;margin-bottom:8px}
+.dl-card button{margin-top:auto}
+.dl-btns{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.dl-btns button{margin-top:0}
+button.ghost{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
+button.ghost:hover{background:var(--teal-soft)}
 @media (max-width:640px){.top-in h1{font-size:17px}}
 </style>
 </head>
@@ -52,9 +62,14 @@ code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere
 <div class="card" id="pkgBanner" style="border-left:5px solid #111"><h2>Your package</h2><div id="pkgStatus">Loading…</div></div>
 <div class="card"><h2>Profile &amp; package</h2><div id="profile">Loading…</div></div>
 <div class="card" id="dlCard"><h2>Downloads</h2>
-<div id="dlLinks" style="display:none"><p>📱 <a href="#" onclick="downloadFile('/download/app.apk','TakaTickSMS-v1.7.apk');return false">Download TakaTick SMS app (APK v1.7)</a> — install on the phone that receives payment SMS.<br><small>Play Protect block korle: Play Store → Play Protect → scanning OFF → install → abar ON.</small><br>
-🛒 <a href="#" onclick="downloadFile('/downloads/takatick-woocommerce-plugin.zip','takatick-woocommerce-plugin.zip');return false">Download WooCommerce plugin (.zip)</a> — Premium only; setup guide in INTEGRATION.md.</p></div>
-<div id="dlLocked" style="display:none"><p>🔒 <strong>Locked</strong> — SMS app (APK) ar WooCommerce plugin download korte package active thakte hobe.</p></div></div>
+<div id="dlLinks" style="display:none">
+<div class="dl-grid">
+<div class="dl-card"><div class="dl-icon">📱</div><h3>TakaTick SMS app</h3><p>APK v1.7 — install on the phone that receives payment SMS.</p><p class="muted"><small>Play Protect block korle: Play Store → Play Protect → scanning OFF → install → abar ON.</small></p><button onclick="downloadFile('/download/app.apk','TakaTickSMS-v1.7.apk')">⬇ Download APK</button></div>
+<div class="dl-card"><div class="dl-icon">🛒</div><h3>WooCommerce plugin</h3><p>WordPress + WooCommerce site-e TakaTick add korun. Premium only.</p><p class="muted"><small>Setup guide in INTEGRATION.md.</small></p><button onclick="downloadFile('/downloads/takatick-woocommerce-plugin.zip','takatick-woocommerce-plugin.zip')">⬇ Download plugin</button></div>
+<div class="dl-card"><div class="dl-icon">⚡</div><h3>Next.js kit — raw code</h3><p>Raw-code / Next.js site-er jonno 2-ta file — key bosalei plug &amp; play.</p><div class="dl-btns"><button onclick="downloadFile('/downloads/TakaTickPayButton.tsx','TakaTickPayButton.tsx')">⬇ Checkout button</button><button class="ghost" onclick="downloadFile('/downloads/takatick-webhook-route.ts','takatick-webhook-route.ts')">⬇ Webhook route</button></div></div>
+</div>
+</div>
+<div id="dlLocked" style="display:none"><p>🔒 <strong>Locked</strong> — SMS app (APK), WooCommerce plugin ar Next.js kit download korte package active thakte hobe.</p></div></div>
 <div class="card"><h2>My package orders</h2><div id="orders">Loading…</div>
 <p><button onclick="location.href='/#pricing'">Upgrade / Renew package</button></p></div>
 <div class="card" id="keysCard"><h2>Keys &amp; pay link</h2><div id="keys"></div>
