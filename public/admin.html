@@ -336,14 +336,38 @@ async function loadTransactions(){
 
 async function loadSettings(){
   const p = await api('/api/public/pricing');
+  const s = await api('/api/admin/settings');
+  if(!s.ok){ document.getElementById('settingsBody').innerHTML = '<p class="muted">' + esc(s.error || 'Failed to load settings') + '</p>'; return; }
   const st = cache.stats || (await api('/api/admin/stats')).stats;
   cache.stats = st;
+  const src = s.sellerBkashSource === 'admin' ? 'admin panel theke set' : s.sellerBkashSource === 'env' ? 'Render env var theke' : 'default';
   document.getElementById('settingsBody').innerHTML = `
     <p>Brand: <strong>${esc(p.brand)}</strong><br>
     Currency: <strong>BDT</strong><br>
-    Seller bKash number (enroll payments go here): <strong>${esc(p.sellerBkash)}</strong><br>
     Grace period: <strong>${p.graceDays} days</strong> (editable in the Packages section)<br>
-    Packages: <strong>${(p.packages || []).map(x => esc(x.name) + ' ৳' + x.priceBDT + '/mo').join(' · ')}</strong></p>`;
+    Packages: <strong>${(p.packages || []).map(x => esc(x.name) + ' ৳' + x.priceBDT + '/mo').join(' · ')}</strong></p>
+    <h3>Seller bKash number</h3>
+    <p class="muted">Package kenar taka ei number-e asbe — enroll page-e eitai dekhay. Source: ${esc(src)}.</p>
+    <label>Seller bKash number <input id="sellerBkashInput" type="tel" value="${esc(s.sellerBkash)}" style="width:180px"></label>
+    <button onclick="saveSellerBkash()">Save</button>
+    <button onclick="resetSellerBkash()" class="outline">Reset to env</button>
+    <span id="sellerMsg" class="muted"></span>
+    <p class="muted"><small>Deploy-er por database muche gele Render env-er number-ta abar karjokor hobe — tokhon ekhane abar save korlei hobe.</small></p>`;
+}
+async function saveSellerBkash(){
+  const v = document.getElementById('sellerBkashInput').value.trim();
+  const o = await api('/api/admin/settings', {method:'POST', body: JSON.stringify({sellerBkash: v})});
+  const m = document.getElementById('sellerMsg');
+  if(!o.ok){ m.textContent = o.message || o.error || 'Failed'; return; }
+  m.textContent = 'Saved — enroll page-e ekhon ' + o.sellerBkash + ' dekhabe.';
+  loadSettings();
+}
+async function resetSellerBkash(){
+  const o = await api('/api/admin/settings', {method:'POST', body: JSON.stringify({sellerBkash: ''})});
+  const m = document.getElementById('sellerMsg');
+  if(!o.ok){ m.textContent = o.message || o.error || 'Failed'; return; }
+  m.textContent = 'Reset — ekhon Render env-er number (' + o.sellerBkash + ') karjokor.';
+  loadSettings();
 }
 
 async function decide(id, action){

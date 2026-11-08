@@ -32,6 +32,33 @@ const PACKAGE_DAYS = 30;
 // Siam's bKash number; SELLER_BKASH_NUMBER env overrides, the fallback
 // below is the same number (it is meant to be shown publicly).
 const SELLER_BKASH_NUMBER = process.env.SELLER_BKASH_NUMBER || '01883042132';
+
+// Admin-editable site settings (v2.9.2) — stored in the `settings` table.
+// Precedence: DB value (set from the admin panel) > Render env var >
+// hardcoded fallback above. So the seller number can be changed from the
+// admin panel with no deploy; a DB wipe (free-tier deploy) falls back to
+// the env value until the admin saves it again.
+function getSetting(key) {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  return row ? row.value : null;
+}
+function setSetting(key, value) {
+  db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+    .run(key, value, new Date().toISOString());
+}
+function clearSetting(key) {
+  db.prepare('DELETE FROM settings WHERE key = ?').run(key);
+}
+function getSellerBkash() {
+  return getSetting('seller_bkash_number') || SELLER_BKASH_NUMBER;
+}
+function sellerBkashSource() {
+  if (getSetting('seller_bkash_number')) return 'admin';
+  if (process.env.SELLER_BKASH_NUMBER) return 'env';
+  return 'default';
+}
+const BKASH_NUMBER_RE = /^01[3-9]\d{8}$/;
 // Admin account: seeded from env on first boot (see ensureAdminSeeded).
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || null;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
@@ -50,7 +77,7 @@ app.use((req, res, next) => {
       const html = fs.readFileSync(path.join(__dirname, 'public', req.path), 'utf8');
       return res.type('html').send(html
         .split('{{BRAND}}').join(escapeHtml(getBrand()))
-        .split('{{SELLER_BKASH}}').join(escapeHtml(SELLER_BKASH_NUMBER)));
+        .split('{{SELLER_BKASH}}').join(escapeHtml(getSellerBkash())));
     } catch (_e) {
       return next();
     }
@@ -67,7 +94,7 @@ app.get('/', (_req, res) => {
     const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
     return res.type('html').send(html
       .split('{{BRAND}}').join(escapeHtml(getBrand()))
-      .split('{{SELLER_BKASH}}').join(escapeHtml(SELLER_BKASH_NUMBER)));
+      .split('{{SELLER_BKASH}}').join(escapeHtml(getSellerBkash())));
   } catch (_e) {
     return res.redirect('/login.html');
   }
@@ -323,7 +350,7 @@ app.get('/api/public/pricing', (_req, res) => {
   return res.json({
     ok: true,
     brand: getBrand(),
-    sellerBkash: SELLER_BKASH_NUMBER,
+    sellerBkash: getSellerBkash(),
     graceDays: getGraceDays(),
     packages,
   });
@@ -413,6 +440,24 @@ function adminAuth(req, res, next) {
     return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
   }
 }
+
+// v2.9.2: admin-editable site settings.
+app.get('/api/admin/settings', adminAuth, (_req, res) => {
+  res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource() });
+});
+app.post('/api/admin/settings', adminAuth, (req, res) => {
+  const { sellerBkash } = req.body || {};
+  if (sellerBkash === '' || sellerBkash === null || sellerBkash === undefined) {
+    clearSetting('seller_bkash_number');
+    return res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource(), cleared: true });
+  }
+  const num = String(sellerBkash).trim();
+  if (!BKASH_NUMBER_RE.test(num)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_NUMBER', message: 'bKash number 11 digit hote hobe, 01 diye shuru (e.g. 01883042132)' });
+  }
+  setSetting('seller_bkash_number', num);
+  return res.json({ ok: true, sellerBkash: getSellerBkash(), sellerBkashSource: sellerBkashSource() });
+});
 
 function adminMerchantRow(m) {
   const exp = expiryState(m);

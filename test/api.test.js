@@ -633,3 +633,38 @@ test('v2.8: paste an SMS from the dashboard (no app needed) + verify/confirm loo
   });
   assert.equal(confirm.json.ok, true, JSON.stringify(confirm.json));
 });
+
+test('v2.9.2: admin can edit the seller bKash number (DB overrides env)', async () => {
+  const tok = await adminToken();
+  const before = await req('/api/admin/settings', { token: tok });
+  assert.equal(before.status, 200, JSON.stringify(before.json));
+  assert.equal(before.json.ok, true);
+  const original = before.json.sellerBkash;
+  assert.match(original, /^01[3-9]\d{8}$/);
+  // No token -> 401.
+  const noAuth = await req('/api/admin/settings');
+  assert.equal(noAuth.status, 401);
+  // Invalid numbers -> 400, value unchanged.
+  for (const bad of ['123', 'abc', '0188304213', '02883042132', '018830421321']) {
+    const r = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerBkash: bad } });
+    assert.equal(r.status, 400, bad);
+    assert.equal(r.json.error, 'INVALID_NUMBER');
+  }
+  const still = await req('/api/admin/settings', { token: tok });
+  assert.equal(still.json.sellerBkash, original);
+  // Valid change -> enroll page + pricing show the new number immediately.
+  const next = original === '01883042132' ? '01999112233' : '01883042132';
+  const save = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerBkash: next } });
+  assert.equal(save.status, 200, JSON.stringify(save.json));
+  assert.equal(save.json.sellerBkash, next);
+  assert.equal(save.json.sellerBkashSource, 'admin');
+  const enroll = await req('/enroll.html?plan=basic');
+  assert.match(enroll.text, new RegExp(next));
+  const pricing = await req('/api/public/pricing');
+  assert.equal(pricing.json.sellerBkash, next);
+  // Reset (empty) -> back to the env/default value.
+  const reset = await req('/api/admin/settings', { method: 'POST', token: tok, body: { sellerBkash: '' } });
+  assert.equal(reset.status, 200, JSON.stringify(reset.json));
+  assert.equal(reset.json.sellerBkash, original);
+  assert.notEqual(reset.json.sellerBkashSource, 'admin');
+});

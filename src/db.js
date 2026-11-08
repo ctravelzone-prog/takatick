@@ -126,6 +126,16 @@ CREATE TABLE IF NOT EXISTS admins (
   password_hash TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+-- Admin-editable site settings (v2.9.2): key/value pairs the master admin
+-- changes from the admin panel (Settings section) — no deploy needed.
+-- A DB value wins over the Render env var; if the DB is wiped (free-tier
+-- deploy), the env value applies again until the admin re-saves it.
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 `);
 
 // Migrations for DBs created before v1.3 (CREATE TABLE IF NOT EXISTS
