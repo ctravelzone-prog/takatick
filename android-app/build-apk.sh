@@ -11,13 +11,13 @@
 # Usage:
 #   export JAVA_HOME=$HOME/jdk17 ANDROID_HOME=$HOME/Android
 #   ./build-apk.sh            # debug-signed test build (default)
-#   RELEASE=1 ./build-apk.sh  # RELEASE build (v1.5): signed with the
+#   RELEASE=1 ./build-apk.sh  # RELEASE build (v1.6): signed with the
 #                             # release keystore (takatick-release.keystore).
 #                             # The keystore password lives ONLY in
 #                             # android-app/.release-keystore-pass (gitignored,
 #                             # never in git/zips) or in RELEASE_STORE_PASS.
 # Output: build-manual/TakaTickSMS.apk (debug) or
-#         build-manual/TakaTickSMS-v1.5.apk (release)
+#         build-manual/TakaTickSMS-v1.6.apk (release)
 #
 # Signing: the debug build uses a DEBUG keystore (takatick-debug.keystore,
 # password "takatick-debug") — TEST-ER JONNO ONLY. The release build uses
@@ -47,7 +47,7 @@ if [ "${RELEASE:-0}" = "1" ]; then
     STORE_PASS="$(cat "$APP_DIR/.release-keystore-pass")"
   fi
   KEY_PASS="$STORE_PASS"
-  OUT_APK="TakaTickSMS-v1.5.apk"
+  OUT_APK="TakaTickSMS-v1.6.apk"
   echo "== RELEASE build (release keystore) -> $OUT_APK =="
 else
   STORE_FILE="$APP_DIR/takatick-debug.keystore"

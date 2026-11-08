@@ -853,10 +853,10 @@ test('v2.7: admin merchant detail has an expiry-date control', async () => {
   assert.match(a.text, /setExpiry\(/);
 });
 
-test('v2.8.1: dashboard offers APK v1.5 (foreground service + 2s scan) + Play Protect install note', async () => {
+test('v2.9.7: dashboard offers APK v1.6 (logo launcher icon) + Play Protect install note', async () => {
   const d = await req('/dashboard.html');
-  assert.match(d.text, /TakaTickSMS-v1\.5\.apk/);
-  assert.match(d.text, /APK v1.5/);
+  assert.match(d.text, /TakaTickSMS-v1\.6\.apk/);
+  assert.match(d.text, /APK v1.6/);
   assert.match(d.text, /Play Protect/);
 });
 
