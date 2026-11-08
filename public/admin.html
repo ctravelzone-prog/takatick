@@ -248,6 +248,10 @@ async function loadMerchantDetail(id){
         <option value="deactivated" ${m.status === 'deactivated' ? 'selected' : ''}>Deactivated</option>
       </select>
       <button onclick="setStatus(${m.id}, document.getElementById('detailStatus').value)">Apply plan status</button>
+      <br><strong>Expiry date:</strong>
+      <input type="datetime-local" id="detailExpiry" value="${m.package_expires_at ? esc(m.package_expires_at.slice(0,16)) : ''}">
+      <button onclick="setExpiry(${m.id}, document.getElementById('detailExpiry').value)">Set expiry</button>
+      <button class="ghost" onclick="setExpiry(${m.id}, '')">Clear expiry</button>
       <button class="ghost" onclick="document.getElementById('merchantDetail').style.display='none'">Close</button>
     </p>`;
   el.scrollIntoView({behavior:'smooth'});
@@ -358,6 +362,15 @@ async function setPackage(id, pkg){
 }
 async function setStatus(id, status){
   const o = await api(`/api/admin/merchants/${id}/status`, {method:'POST', body: JSON.stringify({status})});
+  if(!o.ok) alert(o.error || 'Failed');
+  loadMerchants(); loadDashboard();
+  if(window._detailId) loadMerchantDetail(window._detailId);
+}
+// v2.7: set (or clear) a merchant's expiry date — past dates allowed, so an
+// expiry demo can be staged without waiting 30 days.
+async function setExpiry(id, value){
+  const body = value ? { expiresAt: new Date(value).toISOString() } : { expiresAt: null };
+  const o = await api(`/api/admin/merchants/${id}/expiry`, {method:'POST', body: JSON.stringify(body)});
   if(!o.ok) alert(o.error || 'Failed');
   loadMerchants(); loadDashboard();
   if(window._detailId) loadMerchantDetail(window._detailId);

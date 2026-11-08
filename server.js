@@ -627,6 +627,24 @@ app.post('/api/admin/merchants/:id/package', adminAuth, (req, res) => {
   return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)), keysIssued: keys.issued });
 });
 
+// v2.7: admin sets a merchant's expiry date directly (ISO string, or null
+// to clear = no expiry). Past dates are allowed on purpose — that is how an
+// expiry demo (or a correction) is staged. Status is untouched; the state
+// (active/grace/expired) is always derived from the date.
+app.post('/api/admin/merchants/:id/expiry', adminAuth, (req, res) => {
+  const merchant = getMerchantById(req.params.id);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const raw = req.body?.expiresAt ?? null;
+  if (raw === null || raw === '') {
+    db.prepare('UPDATE merchants SET package_expires_at = NULL WHERE id = ?').run(merchant.id);
+  } else {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return res.status(400).json({ ok: false, error: 'INVALID_DATE' });
+    db.prepare('UPDATE merchants SET package_expires_at = ? WHERE id = ?').run(d.toISOString(), merchant.id);
+  }
+  return res.json({ ok: true, merchant: adminMerchantRow(getMerchantById(merchant.id)) });
+});
+
 app.post('/api/admin/merchants/:id/status', adminAuth, (req, res) => {
   const status = req.body?.status;
   if (status !== 'active' && status !== 'deactivated' && status !== 'pending') {

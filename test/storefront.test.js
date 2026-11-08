@@ -838,3 +838,10 @@ test('v2.6: dashboard shows "No package yet" until an order exists', async () =>
   assert.match(home.text, /waitingPackage/);
   assert.match(home.text, /No package yet/);
 });
+
+test('v2.7: admin merchant detail has an expiry-date control', async () => {
+  const a = await req('/admin.html');
+  assert.match(a.text, /detailExpiry/);
+  assert.match(a.text, /Set expiry/);
+  assert.match(a.text, /setExpiry\(/);
+});

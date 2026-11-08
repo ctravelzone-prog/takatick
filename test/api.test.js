@@ -549,3 +549,43 @@ test('v2.6: profile shows no package until an order exists; waiting package come
   assert.equal(prof3.json.waitingPackage, null);
   assert.equal(prof3.json.package.name, 'Standard');
 });
+
+test('v2.7: admin can set a merchant expiry date (past = expired, future = active)', async () => {
+  const tok = await adminToken();
+  const s = await signup('Expiry Set', 'expset@takatick.test', 'basic');
+  const mid = s.merchant.id;
+  const past = await req(`/api/admin/merchants/${mid}/expiry`, {
+    method: 'POST', token: tok,
+    body: { expiresAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString() },
+  });
+  assert.equal(past.status, 200, JSON.stringify(past.json));
+  const prof = await req('/api/me/profile', { token: s.token });
+  assert.equal(prof.json.expiryState, 'expired');
+  const v = await req('/api/v1/verify', {
+    method: 'POST',
+    body: { apiKey: s.apiKey, amount: 1000, transactionId: 'EXPSET0001' },
+  });
+  assert.equal(v.status, 403);
+  assert.equal(v.json.error, 'PACKAGE_EXPIRED');
+  // Future expiry → active again, verify passes the gate (unknown TrxID).
+  const future = await req(`/api/admin/merchants/${mid}/expiry`, {
+    method: 'POST', token: tok,
+    body: { expiresAt: new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString() },
+  });
+  assert.equal(future.status, 200);
+  const prof2 = await req('/api/me/profile', { token: s.token });
+  assert.equal(prof2.json.expiryState, 'active');
+  const v2 = await req('/api/v1/verify', {
+    method: 'POST',
+    body: { apiKey: s.apiKey, amount: 1000, transactionId: 'EXPSET0002' },
+  });
+  assert.equal(v2.status, 404);
+  assert.equal(v2.json.error, 'TRANSACTION_NOT_FOUND');
+  // Invalid date → 400; merchant token → 403; unknown merchant → 404.
+  const bad = await req(`/api/admin/merchants/${mid}/expiry`, { method: 'POST', token: tok, body: { expiresAt: 'not-a-date' } });
+  assert.equal(bad.status, 400);
+  const noAdmin = await req(`/api/admin/merchants/${mid}/expiry`, { method: 'POST', token: s.token, body: { expiresAt: new Date().toISOString() } });
+  assert.equal(noAdmin.status, 403);
+  const gone = await req('/api/admin/merchants/999999/expiry', { method: 'POST', token: tok, body: { expiresAt: new Date().toISOString() } });
+  assert.equal(gone.status, 404);
+});
