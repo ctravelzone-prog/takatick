@@ -231,7 +231,7 @@ async function loadMerchantDetail(id){
   const el = document.getElementById('merchantDetail');
   el.style.display = '';
   el.innerHTML = `<h3>${esc(m.name)} — ${esc(m.email)}</h3>
-    <p>Package: <strong>${esc(m.package)}</strong> · Status: <span class="pill ${esc(m.status)}">${esc(m.status)}</span> · State: <span class="pill ${esc(m.expiry_state)}">${esc(m.expiry_state)}</span><br>
+    <p>Plan: <strong>${esc(m.package)}</strong> · Plan status: <span class="pill ${esc(m.status)}">${esc(m.status)}</span> · State: <span class="pill ${esc(m.expiry_state)}">${esc(m.expiry_state)}</span><br>
     Expires: ${fmtDate(m.package_expires_at)} · Verifications this month: ${d.verificationsUsedThisMonth} / ${m.verifications_limit ?? '∞'} · API key: <code>${esc(d.apiKeyMasked || '—')}</code><br>
     Websites: ${(d.websites || []).map(esc).join(', ') || '—'}</p>
     <p><strong>Numbers:</strong> ${(d.numbers || []).map(x => esc(x.method) + ' ' + esc(x.number)).join(', ') || '—'}</p>
@@ -240,12 +240,13 @@ async function loadMerchantDetail(id){
     <p>
       <select id="detailPkg"><option value="">Change package…</option><option value="basic">Basic</option><option value="standard">Standard</option><option value="premium">Premium</option></select>
       <button onclick="setPackage(${m.id}, document.getElementById('detailPkg').value)">Apply package</button>
+      <br><strong>Plan status:</strong>
       <select id="detailStatus">
         <option value="active" ${m.status === 'active' ? 'selected' : ''}>Active</option>
         <option value="pending" ${m.status === 'pending' ? 'selected' : ''}>Pending</option>
         <option value="deactivated" ${m.status === 'deactivated' ? 'selected' : ''}>Deactivated</option>
       </select>
-      <button onclick="setStatus(${m.id}, document.getElementById('detailStatus').value)">Apply status</button>
+      <button onclick="setStatus(${m.id}, document.getElementById('detailStatus').value)">Apply plan status</button>
       <button class="ghost" onclick="document.getElementById('merchantDetail').style.display='none'">Close</button>
     </p>`;
   el.scrollIntoView({behavior:'smooth'});

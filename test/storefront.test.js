@@ -113,7 +113,7 @@ test('public pricing returns packages + seller bKash + grace days', async () => 
   assert.equal(byId.premium.priceBDT, 900);
 });
 
-test('landing page at / : hero, features, pricing, FAQ, seller number; /pricing.html redirects', async () => {
+test('landing page at / : hero, features, pricing, FAQ; /pricing.html redirects; seller number on /enroll.html', async () => {
   const r = await req('/');
   assert.equal(r.status, 200, `GET / status ${r.status}`);
   assert.match(r.text, /TakaTick/);
@@ -122,9 +122,13 @@ test('landing page at / : hero, features, pricing, FAQ, seller number; /pricing.
   assert.match(r.text, /Pricing/);
   assert.match(r.text, /Frequently asked questions/);
   assert.match(r.text, /Sign up/);
-  assert.match(r.text, new RegExp(SELLER_BKASH));
   assert.match(r.text, /Log in/);
   assert.doesNotMatch(r.text, /\{\{BRAND\}\}|\{\{SELLER_BKASH\}\}/);
+  // The seller bKash number moved with the wizard to the enroll page.
+  const enroll = await req('/enroll.html');
+  assert.equal(enroll.status, 200);
+  assert.match(enroll.text, new RegExp(SELLER_BKASH));
+  assert.doesNotMatch(enroll.text, /\{\{BRAND\}\}|\{\{SELLER_BKASH\}\}/);
 
   const redir = await req('/pricing.html');
   assert.equal(redir.status, 302);
@@ -321,6 +325,64 @@ test('deactivated merchant verify -> 403 ACCOUNT_DEACTIVATED; reactivate works',
   assert.equal(verifyAgain.json.ok, true, JSON.stringify(verifyAgain.json));
 });
 
+test('plan deactivated: number/website/settings/key writes -> 403 ACCOUNT_DEACTIVATED; reactivate restores', async () => {
+  const off = await req(`/api/admin/merchants/${expiryMerchant.merchant.id}/status`, {
+    method: 'POST', token: adminToken, body: { status: 'deactivated' },
+  });
+  assert.equal(off.json.merchant.status, 'deactivated');
+
+  const profile = await req('/api/me/profile', { token: expiryMerchant.token });
+  assert.equal(profile.json.expiryState, 'deactivated');
+
+  const num = await req('/api/me/numbers', {
+    method: 'POST', token: expiryMerchant.token,
+    body: { method: 'bkash', number: '01712345678', label: 'test' },
+  });
+  assert.equal(num.status, 403);
+  assert.equal(num.json.error, 'ACCOUNT_DEACTIVATED');
+
+  const site = await req('/api/me/websites', {
+    method: 'POST', token: expiryMerchant.token, body: { domain: 'example.com' },
+  });
+  assert.equal(site.status, 403);
+  assert.equal(site.json.error, 'ACCOUNT_DEACTIVATED');
+
+  const settings = await req('/api/me/settings', {
+    method: 'POST', token: expiryMerchant.token, body: { webhook_url: 'https://example.com/hook' },
+  });
+  assert.equal(settings.status, 403);
+  assert.equal(settings.json.error, 'ACCOUNT_DEACTIVATED');
+
+  const regen = await req('/api/me/api-key/regenerate', {
+    method: 'POST', token: expiryMerchant.token, body: {},
+  });
+  assert.equal(regen.status, 403);
+  assert.equal(regen.json.error, 'ACCOUNT_DEACTIVATED');
+
+  const delNum = await req('/api/me/numbers/999999', { method: 'DELETE', token: expiryMerchant.token });
+  assert.equal(delNum.status, 403);
+  assert.equal(delNum.json.error, 'ACCOUNT_DEACTIVATED');
+
+  const on = await req(`/api/admin/merchants/${expiryMerchant.merchant.id}/status`, {
+    method: 'POST', token: adminToken, body: { status: 'active' },
+  });
+  assert.equal(on.json.merchant.status, 'active');
+
+  const numAgain = await req('/api/me/numbers', {
+    method: 'POST', token: expiryMerchant.token,
+    body: { method: 'bkash', number: '01712345678', label: 'test' },
+  });
+  assert.equal(numAgain.status, 201, JSON.stringify(numAgain.json));
+});
+
+test('dashboard shows Plan deactivated state + disabled-actions markup', async () => {
+  const d = await req('/dashboard.html');
+  assert.equal(d.status, 200);
+  assert.match(d.text, /Plan deactivated/);
+  assert.match(d.text, /id="regenBtn"/);
+  assert.match(d.text, /planOff/);
+});
+
 test('admin merchants list shows expiry state; manual package change works', async () => {
   const list = await req('/api/admin/merchants', { token: adminToken });
   assert.equal(list.status, 200);
@@ -430,7 +492,8 @@ test('landing + login pages: logged-in nav hooks present', async () => {
   assert.match(home.text, /border-radius:50%/);
   assert.match(home.text, /href="\/dashboard\.html"/);
   assert.match(home.text, /Go to dashboard/);
-  assert.match(home.text, /id="enrollTitle"/);
+  const enroll = await req('/enroll.html');
+  assert.match(enroll.text, /id="enrollTitle"/);
   const login = await req('/login.html');
   assert.match(login.text, /location\.href='\/dashboard\.html'/);
   assert.match(login.text, /location\.href='\/\#pricing'/);
@@ -440,23 +503,25 @@ test('landing + login pages: logged-in nav hooks present', async () => {
 });
 
 test('signup step asks no plan: no package dropdown, selected plan shown as text', async () => {
-  const home = await req('/');
-  assert.doesNotMatch(home.text, /id="pkgSelect"/);
-  assert.match(home.text, /id="signupPlan"/);
-  assert.match(home.text, /Selected plan:/);
+  const page = await req('/enroll.html');
+  assert.doesNotMatch(page.text, /id="pkgSelect"/);
+  assert.match(page.text, /id="signupPlan"/);
+  assert.match(page.text, /Selected plan:/);
 });
 
-test('enroll is a stepped wizard: hidden until a plan is chosen', async () => {
+test('enroll is a stepped wizard on its own page: landing has none, /enroll.html has all steps', async () => {
   const home = await req('/');
-  assert.match(home.text, /id="enroll" style="background:#fff;display:none"/);
-  assert.match(home.text, /id="planStep"/);
-  assert.match(home.text, /id="planOptions"/);
-  assert.match(home.text, /showEnroll\(\)/);
-  assert.match(home.text, /Choose your plan/);
-  assert.match(home.text, /Continue to payment/);
-  assert.match(home.text, /Step 1 of 3/);
-  assert.match(home.text, /Step 2 of 3/);
-  assert.match(home.text, /Step 3 of 3/);
+  assert.doesNotMatch(home.text, /id="enroll"/);
+  assert.doesNotMatch(home.text, /id="planStep"/);
+  const page = await req('/enroll.html');
+  assert.match(page.text, /id="planStep"/);
+  assert.match(page.text, /id="planOptions"/);
+  assert.match(page.text, /showEnroll\(\)/);
+  assert.match(page.text, /Choose your plan/);
+  assert.match(page.text, /Continue to payment/);
+  assert.match(page.text, /Step 1 of 3/);
+  assert.match(page.text, /Step 2 of 3/);
+  assert.match(page.text, /Step 3 of 3/);
 });
 
 test('v1.8 logo + hero + favicon: files exist and pages reference them', async () => {
@@ -477,11 +542,15 @@ test('v1.8 logo + hero + favicon: files exist and pages reference them', async (
   }
 });
 
-test('v1.8 optimistic profile chip: setProfileChip sets the chip from signup data', async () => {
+test('v1.8 optimistic profile chip: setProfileChip sets the chip from signup data (on /enroll.html)', async () => {
+  const page = await req('/enroll.html');
+  assert.match(page.text, /function setProfileChip/);
+  assert.match(page.text, /setProfileChip\(f\.get\('name'\)/);
+  assert.match(page.text, /Waiting for approval/);
+  assert.match(page.text, /setProfileChip\(p\.merchant\.name, p\.package\.name, stateLabel\)/);
+  // The landing still shows the chip for logged-in merchants via updateNav.
   const home = await req('/');
   assert.match(home.text, /function setProfileChip/);
-  assert.match(home.text, /setProfileChip\(f\.get\('name'\)/);
-  assert.match(home.text, /Waiting for approval/);
   assert.match(home.text, /setProfileChip\(p\.merchant\.name, p\.package\.name, stateLabel\)/);
 });
 
@@ -610,8 +679,10 @@ test('admin login returns ADMIN_NOT_CONFIGURED when no admin exists', async () =
   assert.equal(r.json.error, 'ADMIN_NOT_CONFIGURED');
 });
 
-test('v1.9 plan-choose step: 3-card picker with featured Premium + hidden radios', async () => {
-  const home = await req('/');
+test('v1.9 plan-choose step: 3-card picker with featured Premium + hidden radios (on /enroll.html)', async () => {
+  const page = await req('/enroll.html');
+  assert.equal(page.status, 200);
+  const home = page;
   assert.match(home.text, /id="enrollBox"/);
   assert.match(home.text, /plan-grid/);
   assert.match(home.text, /plan-card/);
@@ -633,4 +704,21 @@ test('v1.9 plan-choose step: 3-card picker with featured Premium + hidden radios
   assert.match(home.text, /confirmPlan\(\)/);
   assert.match(home.text, /Continue to payment/);
   assert.match(home.text, /You can change the plan before paying/);
+  // The enroll page takes the plan from the URL (?plan= / ?package=).
+  assert.match(home.text, /params\.get\('plan'\)/);
+  assert.match(home.text, /loadPricing\(\)\.then\(\(\) => showEnroll\(\)\)/);
+});
+
+test('v2.0 enroll is a separate page: landing has no wizard, Choose navigates to /enroll.html', async () => {
+  const home = await req('/');
+  assert.equal(home.status, 200);
+  assert.doesNotMatch(home.text, /id="enrollBox"/);
+  assert.doesNotMatch(home.text, /renderPlanOptions/);
+  assert.doesNotMatch(home.text, /id="signupForm"/);
+  assert.match(home.text, /\/enroll\.html\?plan=/);
+  assert.match(home.text, /choosePackage/);
+  const page = await req('/enroll.html?plan=standard');
+  assert.equal(page.status, 200);
+  assert.match(page.text, /id="enrollBox"/);
+  assert.match(page.text, /01740707570/);
 });

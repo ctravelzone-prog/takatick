@@ -186,49 +186,6 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
   </div>
 </section>
 
-<section id="enroll" style="background:#fff;display:none">
-  <div class="wrap">
-    <h2 id="enrollTitle">Sign up &amp; buy a package</h2>
-    <p class="sub" id="enrollSub">Create your account, pay by bKash Send Money, submit the TrxID — admin approves and your package activates for 30 days.</p>
-    <div class="enroll-box" id="enrollBox">
-      <div id="enrollMsg"></div>
-      <div id="signupStep">
-        <form id="signupForm">
-          <label>Name</label><input name="name" required>
-          <label>Email</label><input name="email" type="email" required>
-          <label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
-          <p style="font-size:14px;color:#666">Selected plan: <strong id="signupPlan"></strong> — you can change it in the next step.</p>
-          <button class="btn" type="submit" style="width:100%">Create account</button>
-        </form>
-        <p style="color:#666;font-size:14px">Already have an account? <a href="/login.html">Log in</a> — then buy or renew from your dashboard.</p>
-      </div>
-      <div id="planStep" style="display:none">
-        <h3 style="margin-top:0">Choose your plan</h3>
-        <div id="planOptions"></div>
-        <button class="btn" type="button" style="width:100%" onclick="confirmPlan()">Continue to payment</button>
-        <p style="color:#666;font-size:14px">You can change the plan before paying — the payment step always uses the plan selected here.</p>
-      </div>
-      <div id="payStep" style="display:none">
-        <h3 style="margin-top:0">Pay by bKash Send Money</h3>
-        <p>Send exactly <strong id="payAmount"></strong> to this bKash number (Send Money):</p>
-        <p><span class="paynum">{{SELLER_BKASH}}</span>
-        <button type="button" class="btn outline" onclick="navigator.clipboard.writeText('{{SELLER_BKASH}}');this.textContent='Copied!';">Copy number</button></p>
-        <form id="orderForm">
-          <label>Package</label><input id="orderPackage" readonly>
-          <label>Amount (৳, exact)</label><input id="orderAmount" readonly>
-          <label>TrxID (from your bKash payment)</label><input name="trxid" required placeholder="e.g. 9AB12CD34E">
-          <label>Your bKash number (the number you paid from)</label><input name="sender" required placeholder="01XXXXXXXXX">
-          <button class="btn" type="submit" style="width:100%">Submit TrxID</button>
-        </form>
-      </div>
-      <div id="pendingStep" style="display:none">
-        <div class="okbox"><strong>Order submitted!</strong><br><span id="pendingText"></span></div>
-        <p style="margin-top:12px"><a class="btn" href="/dashboard.html">Go to dashboard</a></p>
-      </div>
-    </div>
-  </div>
-</section>
-
 <section id="faq">
   <div class="wrap">
     <h2>Frequently asked questions</h2>
@@ -253,18 +210,12 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
 
 <script>
 let pricingData = null;
-let selectedPackage = (new URLSearchParams(location.search)).get('package') || 'basic';
-const msg = document.getElementById('enrollMsg');
-function showErr(o){ msg.textContent = o.ok ? '' : (o.error || 'Failed'); }
 function fmt(n){ return n === null || n === undefined ? 'Unlimited' : n; }
-function qty(n, one, many){ return n === null || n === undefined ? 'Unlimited ' + many : n + ' ' + (n === 1 ? one : many); }
-function methodName(m){ return {bkash:'bKash',nagad:'Nagad',rocket:'Rocket',upay:'Upay'}[m] || m; }
 
 async function loadPricing(){
   const r = await fetch('/api/public/pricing');
   pricingData = await r.json();
   const pkgs = pricingData.packages || [];
-  if(!pkgs.some(p => p.id === selectedPackage)) selectedPackage = pkgs[0]?.id || 'basic';
   document.getElementById('priceCards').innerHTML = pkgs.map(p => `
     <div class="card price-card ${p.id==='premium'?'popular':''}">
       ${p.id==='premium'?'<span class="badge">Most popular</span>':''}
@@ -280,124 +231,12 @@ async function loadPricing(){
       </ul>
       <button class="btn" style="width:100%" onclick="choosePackage('${p.id}')">Choose ${p.name}</button>
     </div>`).join('');
-  updateSignupPlan();
-  updatePayStep();
 }
-function updateSignupPlan(){
-  const p = pkgById(selectedPackage);
-  const el = document.getElementById('signupPlan');
-  if(p && el) el.textContent = p.name + ' — ৳' + p.priceBDT + '/mo';
-}
+// Pricing 'Choose' opens the enroll wizard on its own page.
 function choosePackage(id){
-  selectedPackage = id;
-  updateSignupPlan();
-  showEnroll();
+  location.href = '/enroll.html?plan=' + encodeURIComponent(id);
 }
-function setEnrollTitle(t, s){
-  document.getElementById('enrollTitle').textContent = t;
-  document.getElementById('enrollSub').textContent = s;
-}
-function hideAllSteps(){
-  document.getElementById('enrollBox').classList.remove('wide');
-  ['signupStep','planStep','payStep','pendingStep'].forEach(id => {
-    document.getElementById(id).style.display = 'none';
-  });
-}
-function showSignupStep(){
-  setEnrollTitle('Create your account', 'Step 1 of 3 — create your account to buy a package.');
-  hideAllSteps();
-  document.getElementById('signupStep').style.display = 'block';
-}
-function renderPlanOptions(){
-  const pkgs = pricingData?.packages || [];
-  // Fixed display order: Basic → Standard → Premium. The API returns the
-  // config's alphabetical order (basic, premium, standard) — do not rely
-  // on it for the layout.
-  const order = ['basic','standard','premium'];
-  const sorted = [...pkgs].sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
-  document.getElementById('planOptions').innerHTML = '<div class="plan-grid">' + sorted.map(p => {
-    const sel = p.id === selectedPackage;
-    const feat = p.id === 'premium';
-    const extra = [['Webhook', p.webhook], ['WooCommerce plugin', p.woocommerce], ['Priority support', p.prioritySupport]];
-    return `
-    <label class="plan-card${sel ? ' selected' : ''}${feat ? ' featured' : ''}">
-      <input type="radio" name="plan" value="${p.id}" ${sel ? 'checked' : ''} onchange="selectedPackage=this.value;renderPlanOptions();updatePayStep();">
-      ${feat ? '<span class="plan-ribbon">★ Most Popular</span>' : ''}
-      ${sel ? '<span class="plan-selected-badge">✓ Selected</span>' : ''}
-      <span class="plan-name">${p.name}</span>
-      <span class="plan-price">৳${p.priceBDT}<span class="plan-per">/mo</span></span>
-      <span class="plan-per-month">per month</span>
-      <span class="plan-divider"></span>
-      <span class="plan-feat">✓ ${qty(p.numbers, 'MFS number', 'MFS numbers')}</span>
-      <span class="plan-feat">✓ ${qty(p.websites, 'website', 'websites')}</span>
-      <span class="plan-feat">✓ ${qty(p.verificationsPerMonth, 'verification', 'verifications')}/mo</span>
-      <span class="plan-methods">${p.methods.map(m => `<span class="method-chip">${methodName(m)}</span>`).join('')}</span>
-      ${extra.map(([label, ok]) => `<span class="plan-feat${ok ? '' : ' off'}">${ok ? '✓' : '—'} ${label}</span>`).join('')}
-    </label>`;
-  }).join('') + '</div>';
-}
-function showPlanStep(){
-  setEnrollTitle('Choose your plan', 'Step 2 of 3 — pick a package.');
-  renderPlanOptions();
-  hideAllSteps();
-  document.getElementById('planStep').style.display = 'block';
-  document.getElementById('enrollBox').classList.add('wide');
-}
-function showPayStep(){
-  updatePayStep();
-  setEnrollTitle('Pay by bKash Send Money', 'Step 3 of 3 — send the exact amount, submit the TrxID. Admin approves and your package activates for 30 days.');
-  hideAllSteps();
-  document.getElementById('payStep').style.display = 'block';
-}
-function confirmPlan(){ showPayStep(); }
-// Step wizard: the enroll section stays hidden until a plan is chosen.
-// Logged-in merchants skip signup and land on the plan step.
-function showEnroll(){
-  document.getElementById('enroll').style.display = '';
-  if(localStorage.getItem('token')){ showPlanStep(); } else { showSignupStep(); }
-  document.getElementById('enroll').scrollIntoView({behavior:'smooth'});
-}
-function pkgById(id){ return (pricingData?.packages || []).find(p => p.id === id); }
-function updatePayStep(){
-  const p = pkgById(selectedPackage);
-  if(!p) return;
-  document.getElementById('payAmount').textContent = '৳' + p.priceBDT;
-  document.getElementById('orderPackage').value = p.name + ' — ৳' + p.priceBDT + '/mo';
-  document.getElementById('orderAmount').value = p.priceBDT;
-}
-async function post(url, body, token){
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', ...(token?{Authorization:'Bearer '+token}:{})}, body: JSON.stringify(body)});
-  return r.json();
-}
-document.getElementById('signupForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: selectedPackage});
-  if(!o.ok){ showErr(o); return; }
-  const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
-  if(!login.ok){ msg.textContent = 'Account created. Please log in.'; return; }
-  localStorage.setItem('token', login.token);
-  msg.textContent = '';
-  // Optimistic profile chip: show who is logged in immediately from the
-  // signup data (name + chosen plan + Waiting for approval) — do not wait
-  // for the /api/me/profile fetch. updateNav() on later loads still
-  // validates via the API.
-  const pkg = pkgById(selectedPackage);
-  setProfileChip(f.get('name'), pkg ? pkg.name : '', 'Waiting for approval');
-  showPlanStep();
-});
-document.getElementById('orderForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const token = localStorage.getItem('token');
-  const f = new FormData(e.target);
-  const p = pkgById(selectedPackage);
-  const o = await post('/api/me/orders', {package: selectedPackage, trxid: f.get('trxid'), sender: f.get('sender'), amount: p.priceBDT}, token);
-  if(!o.ok){ showErr(o); return; }
-  hideAllSteps();
-  document.getElementById('pendingStep').style.display = 'block';
-  document.getElementById('pendingText').textContent =
-    `Order #${o.order.id} (${p.name}, ৳${p.priceBDT}) is pending. Admin approve korle package active hobe (30 din) — dashboard-e check korun.`;
-});
+
 function logout(){ localStorage.removeItem('token'); location.reload(); }
 // Renders the header profile chip from data already in hand (name +
 // package + state). updateNav() calls this after the API check; the
@@ -430,9 +269,9 @@ async function updateNav(){
     localStorage.removeItem('token');
   }
 }
-// Direct #enroll link (old bookmarks): open the wizard at the right step,
-// after the token check so a dead token shows signup, not the plan step.
-updateNav().then(() => { if(location.hash === '#enroll'){ showEnroll(); } });
+// Old #enroll bookmarks: the wizard now lives on its own page.
+if(location.hash === '#enroll'){ location.href = '/enroll.html'; }
+updateNav();
 loadPricing();
 </script>
 </body>

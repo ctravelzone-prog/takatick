@@ -40,12 +40,12 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Brand injection for static pages: login.html / dashboard.html / pricing.html /
-// admin.html carry the {{BRAND}} placeholder (no hardcoded brand string in the
+// admin.html / enroll.html carry the {{BRAND}} placeholder (no hardcoded brand string in the
 // pages). The brand comes from the single config value — config/packages.json
 // `brand`, or BRAND_NAME env which overrides it (see getBrand() in src/limits.js).
 // pricing.html also gets {{SELLER_BKASH}} (Siam's public bKash number).
 app.use((req, res, next) => {
-  if (req.path === '/login.html' || req.path === '/dashboard.html' || req.path === '/admin.html') {
+  if (req.path === '/login.html' || req.path === '/dashboard.html' || req.path === '/admin.html' || req.path === '/enroll.html') {
     try {
       const html = fs.readFileSync(path.join(__dirname, 'public', req.path), 'utf8');
       return res.type('html').send(html
@@ -193,6 +193,18 @@ function merchantBlocked(merchant) {
   if (st === 'pending') return { error: 'PACKAGE_NOT_ACTIVE', status: 403 };
   if (st === 'expired') return { error: 'PACKAGE_EXPIRED', status: 403 };
   return null;
+}
+
+// Plan-deactivated merchants may still read their dashboard and buy/renew
+// (POST /api/me/orders stays open so they can come back), but they may not
+// change anything: no numbers/websites, no deletes, no settings, no key
+// regeneration. Verify/confirm/pay are already blocked by merchantBlocked.
+function blockIfPlanOff(merchant, res) {
+  if (merchant && merchant.status === 'deactivated') {
+    res.status(403).json({ ok: false, error: 'ACCOUNT_DEACTIVATED' });
+    return true;
+  }
+  return false;
 }
 
 // JWT auth middleware: Authorization: Bearer <jwt> -> req.merchantId
@@ -676,6 +688,7 @@ app.get('/api/me/profile', auth, (req, res) => {
 app.post('/api/me/api-key/regenerate', auth, (req, res) => {
   const merchant = getMerchantById(req.merchantId);
   if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (blockIfPlanOff(merchant, res)) return;
   db.prepare('UPDATE api_keys SET revoked = 1 WHERE merchant_id = ? AND revoked = 0')
     .run(merchant.id);
   const apiKey = 'sk_live_' + crypto.randomBytes(24).toString('hex');
@@ -707,6 +720,7 @@ app.post('/api/me/numbers', auth, (req, res) => {
     return res.status(400).json({ ok: false, error: 'INVALID_NUMBER' });
   }
   const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
   const pkg = getPackage(merchant.package);
   // Tier gate: Rocket + Upay are Premium-only (Basic/Standard = bkash/nagad).
   if (!methodAllowedForPackage(pkg, method)) {
@@ -729,6 +743,8 @@ app.post('/api/me/numbers', auth, (req, res) => {
 });
 
 app.delete('/api/me/numbers/:id', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
   const info = db.prepare('DELETE FROM numbers WHERE id = ? AND merchant_id = ?')
     .run(req.params.id, req.merchantId);
   if (info.changes === 0) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
@@ -736,6 +752,8 @@ app.delete('/api/me/numbers/:id', auth, (req, res) => {
 });
 
 app.delete('/api/me/numbers', auth, (req, res) => {
+  const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
   const id = req.body?.id;
   if (!id) return res.status(400).json({ ok: false, error: 'INVALID_REQUEST' });
   const info = db.prepare('DELETE FROM numbers WHERE id = ? AND merchant_id = ?')
@@ -766,6 +784,7 @@ app.post('/api/me/websites', auth, (req, res) => {
     return res.status(400).json({ ok: false, error: 'INVALID_DOMAIN' });
   }
   const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
   const pkg = getPackage(merchant.package);
   const sites = getWebsites(merchant);
   if (sites.includes(domain)) return res.json({ ok: true, websites: sites });
@@ -779,6 +798,7 @@ app.post('/api/me/websites', auth, (req, res) => {
 
 app.delete('/api/me/websites/:domain', auth, (req, res) => {
   const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
   const sites = getWebsites(merchant).filter((d) => d !== req.params.domain.toLowerCase());
   db.prepare('UPDATE merchants SET websites = ? WHERE id = ?').run(JSON.stringify(sites), merchant.id);
   return res.json({ ok: true, websites: sites });
@@ -787,12 +807,15 @@ app.delete('/api/me/websites/:domain', auth, (req, res) => {
 app.delete('/api/me/websites', auth, (req, res) => {
   const domain = String(req.body?.domain || '').trim().toLowerCase();
   const merchant = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant, res)) return;
   const sites = getWebsites(merchant).filter((d) => d !== domain);
   db.prepare('UPDATE merchants SET websites = ? WHERE id = ?').run(JSON.stringify(sites), merchant.id);
   return res.json({ ok: true, websites: sites });
 });
 
 app.post('/api/me/settings', auth, (req, res) => {
+  const merchant0 = getMerchantById(req.merchantId);
+  if (blockIfPlanOff(merchant0, res)) return;
   const { webhook_url, success_url, fail_url } = req.body || {};
   db.prepare('UPDATE merchants SET webhook_url = ?, success_url = ?, fail_url = ? WHERE id = ?')
     .run(webhook_url || null, success_url || null, fail_url || null, req.merchantId);
