@@ -1,4 +1,4 @@
-/* TakaTick embed checkout (v2.9.5) — paste this into any web page, no server
+/* TakaTick embed checkout (v2.9.6) — paste this into any web page, no server
  * code needed on the merchant's side:
  *
  *   <div id="takatick-checkout" data-pay-key="pay_..."
