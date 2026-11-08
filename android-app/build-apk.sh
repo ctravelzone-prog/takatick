@@ -17,7 +17,7 @@
 #                             # android-app/.release-keystore-pass (gitignored,
 #                             # never in git/zips) or in RELEASE_STORE_PASS.
 # Output: build-manual/TakaTickSMS.apk (debug) or
-#         build-manual/TakaTickSMS-v1.2.apk (release)
+#         build-manual/TakaTickSMS-v1.3.apk (release)
 #
 # Signing: the debug build uses a DEBUG keystore (takatick-debug.keystore,
 # password "takatick-debug") — TEST-ER JONNO ONLY. The release build uses
@@ -47,7 +47,7 @@ if [ "${RELEASE:-0}" = "1" ]; then
     STORE_PASS="$(cat "$APP_DIR/.release-keystore-pass")"
   fi
   KEY_PASS="$STORE_PASS"
-  OUT_APK="TakaTickSMS-v1.2.apk"
+  OUT_APK="TakaTickSMS-v1.3.apk"
   echo "== RELEASE build (release keystore) -> $OUT_APK =="
 else
   STORE_FILE="$APP_DIR/takatick-debug.keystore"

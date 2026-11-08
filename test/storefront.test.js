@@ -846,9 +846,9 @@ test('v2.7: admin merchant detail has an expiry-date control', async () => {
   assert.match(a.text, /setExpiry\(/);
 });
 
-test('v2.7.2: dashboard offers APK v1.2 (no READ_SMS) + Play Protect install note', async () => {
+test('v2.7.3: dashboard offers APK v1.3 (restricted-permission guide) + Play Protect install note', async () => {
   const d = await req('/dashboard.html');
-  assert.match(d.text, /TakaTickSMS-v1.2.apk/);
-  assert.match(d.text, /APK v1.2/);
+  assert.match(d.text, /TakaTickSMS-v1.3.apk/);
+  assert.match(d.text, /APK v1.3/);
   assert.match(d.text, /Play Protect/);
 });
