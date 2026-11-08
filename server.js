@@ -1238,18 +1238,26 @@ app.post('/api/v1/confirm', (req, res) => {
 
 function payPageHtml(brand, merchant, numbers, amount, orderId, notice) {
   const amountText = amount ? `৳${escapeHtml(amount)}` : '';
-  // Group the merchant's numbers by method (only registered numbers shown).
+  // v2.9.4: the customer picks a payment method — the merchant's registered
+  // methods only, as logo options. Unregistered methods never appear.
   const methodLabels = { bkash: 'bKash', nagad: 'Nagad', rocket: 'Rocket', upay: 'Upay' };
-  const groups = ALL_METHODS.filter((m) => numbers.some((n) => n.method === m)).map((m) => {
+  const methods = ALL_METHODS.filter((m) => numbers.some((n) => n.method === m));
+  const options = methods.map((m) => `
+    <button type="button" class="mfs-opt${m === methods[0] ? ' selected' : ''}" data-method="${m}" onclick="selectMfs('${m}')">
+      <img src="/mfs/${m}.png" alt="${escapeHtml(methodLabels[m])}"><span>${escapeHtml(methodLabels[m])}</span>
+    </button>`).join('');
+  const details = methods.map((m) => {
     const rows = numbers.filter((n) => n.method === m).map((n) => `
     <div class="num">
-      <div><strong>${escapeHtml(methodLabels[m])}</strong> — ${escapeHtml(n.number)}
+      <div><span class="paynum">${escapeHtml(n.number)}</span>
       ${n.label ? `<span class="label">${escapeHtml(n.label)}</span>` : ''}</div>
-      <button type="button" onclick="navigator.clipboard.writeText('${escapeHtml(n.number)}');this.textContent='Copied!';">Copy</button>
+      <button type="button" onclick="copyNum(this, '${escapeHtml(n.number)}')">Copy</button>
     </div>`).join('');
-    return `<h4>${escapeHtml(methodLabels[m])}</h4>${rows}`;
+    return `<div class="mfs-detail" id="mfs-detail-${m}"${m === methods[0] ? '' : ' style="display:none"'}>${rows}</div>`;
   }).join('');
-  const rows = groups || '<p>No payment numbers added yet.</p>';
+  const body = methods.length
+    ? `<p class="muted">Choose a payment method:</p>\n<div class="mfs-grid">${options}</div>\n${details}`
+    : '<p>No payment numbers added yet.</p>';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pay — ${escapeHtml(brand)}</title>
@@ -1258,21 +1266,35 @@ function payPageHtml(brand, merchant, numbers, amount, orderId, notice) {
 .num{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #eee}
 .label{color:#666;font-size:13px}button{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#111;color:#fff;cursor:pointer}
 input,select{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
-h1{font-size:22px}.muted{color:#666;font-size:14px}.notice{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px}</style></head><body>
+h1{font-size:22px}.muted{color:#666;font-size:14px}.notice{background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px;font-size:14px}
+.mfs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin:12px 0}
+.mfs-opt{border:2px solid #e5e5e5;border-radius:12px;padding:10px 6px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:#222}
+.mfs-opt.selected{border-color:#0f766e;background:#f0fdfa}
+.mfs-opt img{height:36px;max-width:90%;object-fit:contain}
+.mfs-opt span{font-size:13px;font-weight:700}
+.mfs-detail{margin:4px 0 8px}
+.paynum{font-size:20px;font-weight:700}</style></head><body>
 <div class="card"><h1>Pay ${escapeHtml(brand)}</h1>
 ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
-<p class="muted">Pay to ${escapeHtml(merchant.name)} using bKash, Nagad, Rocket or Upay, then enter your TrxID below.</p>
+<p class="muted">Pay to ${escapeHtml(merchant.name)} — choose a method, send the exact amount to that number, then enter your TrxID below.</p>
 ${amountText ? `<p><strong>Amount:</strong> ${amountText}</p>` : ''}
 ${orderId ? `<p><strong>Order:</strong> ${escapeHtml(orderId)}</p>` : ''}
-<h3>Payment numbers</h3>${rows}
+${body}
 <form method="POST" action="/pay/${escapeHtml(merchant.pay_key)}/claim">
 <input type="hidden" name="amount" value="${escapeHtml(amount || '')}">
 <input type="hidden" name="order_id" value="${escapeHtml(orderId || '')}">
-<label>Method</label><select name="method"><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="upay">Upay</option></select>
+<input type="hidden" name="method" id="payMethodInput" value="${methods[0] || 'bkash'}">
 <label>TrxID</label><input name="transactionId" required placeholder="e.g. 9AB12CD34E">
 <button type="submit" style="width:100%">I have paid — Confirm</button></form>
 <p class="muted">Money goes directly to the seller's own bKash / Nagad / Rocket / Upay number. ${escapeHtml(brand)} only verifies the payment.</p>
-</div></body></html>`;
+</div><script>
+function selectMfs(m){
+  document.querySelectorAll('.mfs-opt').forEach(function(b){ b.classList.toggle('selected', b.dataset.method === m); });
+  document.querySelectorAll('.mfs-detail').forEach(function(d){ d.style.display = d.id === 'mfs-detail-' + m ? '' : 'none'; });
+  document.getElementById('payMethodInput').value = m;
+}
+function copyNum(btn, num){ navigator.clipboard.writeText(num); btn.textContent = 'Copied!'; }
+</script></body></html>`;
 }
 
 function resultPageHtml(brand, title, message, linkUrl, linkText) {
@@ -1285,6 +1307,32 @@ a{color:#0b5fff}</style></head><body><div class="card"><h1>${escapeHtml(title)}<
 ${linkUrl ? `<p><a href="${escapeHtml(linkUrl)}">${escapeHtml(linkText || 'Continue')}</a></p>` : ''}
 </div></body></html>`;
 }
+
+// v2.9.5: the embed widget runs on the merchant's own site (another origin).
+// The pay key is public by design (it is in the pay link), so these
+// read/claim endpoints allow any origin. The HTML pay page is unaffected.
+app.use('/pay/:payKey', (req, res, next) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  return next();
+});
+
+// v2.9.5: public JSON for the embed widget — the merchant's registered
+// methods + numbers (the same info the pay page shows publicly).
+app.get('/pay/:payKey/methods', (req, res) => {
+  const merchant = db.prepare('SELECT * FROM merchants WHERE pay_key = ?').get(req.params.payKey);
+  if (!merchant) return res.status(404).json({ ok: false, error: 'NOT_FOUND', message: 'This payment link is invalid.' });
+  const blocked = merchantBlocked(merchant);
+  if (blocked) return res.status(blocked.status).json({ ok: false, error: blocked.error });
+  const numbers = db.prepare('SELECT method, number, label FROM numbers WHERE merchant_id = ? ORDER BY id').all(merchant.id);
+  const methods = ALL_METHODS.filter((m) => numbers.some((n) => n.method === m)).map((m) => ({
+    method: m,
+    numbers: numbers.filter((n) => n.method === m).map((n) => ({ number: n.number, label: n.label || null })),
+  }));
+  return res.json({ ok: true, merchant: merchant.name, brand: getBrand(), methods });
+});
 
 app.get('/pay/:payKey', (req, res) => {
   const merchant = db.prepare('SELECT * FROM merchants WHERE pay_key = ?').get(req.params.payKey);
@@ -1316,9 +1364,18 @@ app.get('/pay/:payKey', (req, res) => {
 app.post('/pay/:payKey/claim', (req, res) => {
   const merchant = db.prepare('SELECT * FROM merchants WHERE pay_key = ?').get(req.params.payKey);
   const brand = getBrand();
-  if (!merchant) return res.status(404).send(resultPageHtml(brand, 'Not found', 'This payment link is invalid.', null, null));
+  // v2.9.5: the embed widget asks for JSON (Accept: application/json) and
+  // shows the result on the merchant's own page; the plain HTML form keeps
+  // getting HTML pages, exactly as before.
+  const wantJson = (req.headers.accept || '').includes('application/json');
+  const fail = (status, title, message) => {
+    if (wantJson) return res.status(status).json({ ok: false, error: title, message });
+    return res.status(status).send(resultPageHtml(brand, title, message, merchant ? merchant.fail_url : null, merchant && merchant.fail_url ? 'Return to store' : null));
+  };
+  if (!merchant) return fail(404, 'Not found', 'This payment link is invalid.');
   const blocked = merchantBlocked(merchant);
   if (blocked) {
+    if (wantJson) return res.status(blocked.status).json({ ok: false, error: blocked.error });
     if (blocked.error === 'PACKAGE_NOT_ACTIVE') {
       return res.status(403).send(resultPageHtml(brand,
         'Payment not active yet',
@@ -1338,8 +1395,7 @@ app.post('/pay/:payKey/claim', (req, res) => {
   const transactionId = req.body?.transactionId || req.body?.transaction_id || req.body?.trxid;
   const amountPoisha = toPoisha(amount);
   if (!transactionId || !amountPoisha || amountPoisha <= 0) {
-    return res.status(400).send(resultPageHtml(brand, 'Payment failed',
-      'Please provide a valid amount and TrxID.', merchant.fail_url, 'Return to store'));
+    return fail(400, 'Payment failed', 'Please provide a valid amount and TrxID.');
   }
   const sms = db.prepare('SELECT * FROM sms_transactions WHERE trxid = ? AND merchant_id = ?')
     .get(String(transactionId).trim(), merchant.id);
@@ -1355,16 +1411,14 @@ app.post('/pay/:payKey/claim', (req, res) => {
     }
   }
   if (reason) {
-    return res.status(409).send(resultPageHtml(brand, 'Payment failed', reason,
-      merchant.fail_url, merchant.fail_url ? 'Return to store' : null));
+    return fail(409, 'Payment failed', reason);
   }
   // Internally verify + confirm: mark used, record a confirmed verification.
   const marked = db.prepare(
     "UPDATE sms_transactions SET status = 'used', used_at = ? WHERE trxid = ? AND merchant_id = ? AND status = 'received'"
   ).run(nowIso(), sms.trxid, merchant.id);
   if (marked.changes === 0) {
-    return res.status(409).send(resultPageHtml(brand, 'Payment failed',
-      'Already used — this TrxID has already been used for a payment.', merchant.fail_url, 'Return to store'));
+    return fail(409, 'Payment failed', 'Already used — this TrxID has already been used for a payment.');
   }
   db.prepare(
     `INSERT INTO verifications (merchant_id, order_id, amount_poisha, transaction_id, status, created_at)
@@ -1380,6 +1434,7 @@ app.post('/pay/:payKey/claim', (req, res) => {
     confirmedAt: nowIso(),
   };
   fireWebhook(merchant, payload).catch(() => {});
+  if (wantJson) return res.json({ ok: true, ...payload });
   if (merchant.success_url) {
     const sep = merchant.success_url.includes('?') ? '&' : '?';
     const url = `${merchant.success_url}${sep}order_id=${encodeURIComponent(orderId || '')}&status=confirmed`;

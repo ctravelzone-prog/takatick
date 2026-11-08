@@ -692,3 +692,53 @@ test('v2.9.3: admin can add Nagad/Upay seller numbers; pricing offers them', asy
   pricing = await req('/api/public/pricing');
   assert.deepEqual(pricing.json.sellerNumbers, { bkash: '01883042132' });
 });
+
+test('v2.9.5: pay methods endpoint returns registered methods only + CORS', async () => {
+  const r = await req(`/pay/${premium.payKey}/methods`);
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.ok, true);
+  assert.deepEqual(r.json.methods.map((m) => m.method), ['rocket', 'upay']);
+  assert.deepEqual(r.json.methods[0].numbers, [{ number: '01722223333', label: 'Shop rocket' }]);
+  assert.deepEqual(r.json.methods[1].numbers, [{ number: '01933334444', label: 'Shop upay' }]);
+  const bad = await req('/pay/pay_00000000000000000000000000000000/methods');
+  assert.equal(bad.status, 404);
+  assert.equal(bad.json.error, 'NOT_FOUND');
+  const raw = await fetch(`${base}/pay/${premium.payKey}/methods`);
+  assert.equal(raw.headers.get('access-control-allow-origin'), '*');
+});
+
+test('v2.9.5: JSON claim confirms payment (embed widget flow)', async () => {
+  await req('/api/sms', {
+    method: 'POST', appKey: premium.appKey,
+    body: { sender: 'Rocket', text: 'You have received Tk 750.00 from 01722223333. TrxID: JSONCLM001. Your Rocket balance is Tk 3,000.00.' },
+  });
+  const claim = await req(`/pay/${premium.payKey}/claim`, {
+    method: 'POST', headers: { Accept: 'application/json' },
+    body: { method: 'rocket', amount: 750, order_id: 'ORD-J1', transactionId: 'JSONCLM001' },
+  });
+  assert.equal(claim.status, 200, JSON.stringify(claim.json));
+  assert.equal(claim.json.ok, true);
+  assert.equal(claim.json.event, 'payment.confirmed');
+  assert.equal(claim.json.transactionId, 'JSONCLM001');
+  assert.equal(claim.json.order_id, 'ORD-J1');
+  // Unknown TrxID -> JSON error, not an HTML page.
+  const bad = await req(`/pay/${premium.payKey}/claim`, {
+    method: 'POST', headers: { Accept: 'application/json' },
+    body: { method: 'rocket', amount: 750, order_id: 'ORD-J2', transactionId: 'NOPE123456' },
+  });
+  assert.equal(bad.status, 409, JSON.stringify(bad.json));
+  assert.equal(bad.json.ok, false);
+  assert.match(bad.json.message, /Unknown TrxID/);
+});
+
+test('v2.9.4/5: embed widget + MFS logos are served', async () => {
+  const js = await req('/takatick-embed.js');
+  assert.equal(js.status, 200);
+  assert.match(js.text, /takatick-checkout/);
+  assert.match(js.text, /\/mfs\//);
+  for (const m of ['bkash', 'nagad', 'rocket', 'upay']) {
+    const img = await fetch(`${base}/mfs/${m}.png`);
+    assert.equal(img.status, 200, m);
+    assert.match(img.headers.get('content-type') || '', /image\/png/);
+  }
+});

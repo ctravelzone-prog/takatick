@@ -1042,4 +1042,5 @@ test('v2.9.3: enroll offers every seller method with a number (bKash/Nagad/Upay,
   assert.match(enroll.text, /id="payMethods"/);
   assert.match(enroll.text, /selectPayMethod/);
   assert.match(enroll.text, /sellerNumbers/);
+  assert.match(enroll.text, /\/mfs\//);
 });

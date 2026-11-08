@@ -64,6 +64,9 @@ input:focus,select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 
 label{font-size:14px;font-weight:600}
 #enrollMsg{color:#b00;min-height:1.2em}
 .paynum{font-size:22px;font-weight:800;letter-spacing:1px;color:var(--teal-dark)}
+.pay-method-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px}
+.pay-method-btn img{height:30px;max-width:90%;object-fit:contain}
+.pay-method-btn span{font-size:13px;font-weight:700}
 .okbox{background:#e9f7ee;border:1px solid #7cc79a;border-radius:8px;padding:12px;font-size:15px}
 @media (max-width:760px){
   .nav a.link{display:none}
@@ -182,7 +185,7 @@ function renderPayMethods(){
   const methods = sellerMethods();
   if(!methods.includes(selectedPayMethod)) selectedPayMethod = methods[0];
   document.getElementById('payMethods').innerHTML = methods.map(m =>
-    `<button type="button" class="btn${m === selectedPayMethod ? '' : ' outline'}" onclick="selectPayMethod('${m}')" style="flex:1">${methodName(m)}</button>`).join('');
+    `<button type="button" class="btn pay-method-btn${m === selectedPayMethod ? '' : ' outline'}" onclick="selectPayMethod('${m}')" style="flex:1"><img src="/mfs/${m}.png" alt="${methodName(m)}"><span>${methodName(m)}</span></button>`).join('');
 }
 function applyPayMethod(){
   const methods = sellerMethods();

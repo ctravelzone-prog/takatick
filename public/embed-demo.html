@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TakaTick embed checkout — demo</title>
+<style>body{font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f7f7f7;color:#222}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px}
+input{width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
+button{padding:10px 16px;border-radius:8px;border:0;background:#0f766e;color:#fff;cursor:pointer;font-weight:700}
+code{background:#f0f0f0;padding:2px 6px;border-radius:4px}
+.muted{color:#666;font-size:14px}</style></head><body>
+<div class="card">
+  <h1 style="margin-top:0">TakaTick embed checkout — demo</h1>
+  <p class="muted">Paste a pay key (dashboard &rarr; Pay link, the <code>pay_...</code> part) and an amount, then the checkout below loads exactly like it would on a merchant's own website.</p>
+  <form method="GET" action="/embed-demo.html">
+    <label>Pay key</label><input name="pay_key" id="payKeyInput" required placeholder="pay_...">
+    <label>Amount (&#2547;)</label><input name="amount" id="amountInput" type="number" min="1" placeholder="750">
+    <label>Order ID (optional)</label><input name="order_id" id="orderInput" placeholder="ORD-123">
+    <button type="submit">Load checkout</button>
+  </form>
+</div>
+<div id="takatick-checkout" data-pay-key="" data-amount="" data-order-id=""></div>
+<script>
+  var q = new URLSearchParams(location.search);
+  var pk = q.get('pay_key') || '';
+  var amt = q.get('amount') || '';
+  var oid = q.get('order_id') || '';
+  document.getElementById('payKeyInput').value = pk;
+  document.getElementById('amountInput').value = amt;
+  document.getElementById('orderInput').value = oid;
+  var box = document.getElementById('takatick-checkout');
+  box.setAttribute('data-pay-key', pk);
+  box.setAttribute('data-amount', amt);
+  box.setAttribute('data-order-id', oid);
+</script>
+<script src="/takatick-embed.js"></script>
+</body></html>

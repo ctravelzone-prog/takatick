@@ -25,6 +25,15 @@ The root `/` is the TakaTick website: hero, features, how-it-works, pricing, FAQ
 
 **Downloads (dashboard):** TakaTick SMS app APK (`/download/app.apk`, v1.0) and the WooCommerce plugin zip (`/downloads/takatick-woocommerce-plugin.zip`).
 
+**Embed checkout on your own website (v2.9.5, no server code):** paste this where the payment button should appear on any page — the `<div>` goes where the checkout shows, the `<script>` goes right before `</body>`:
+
+```html
+<div id="takatick-checkout" data-pay-key="pay_..." data-amount="750" data-order-id="ORD-123" data-success-url="https://yourstore.com/thank-you"></div>
+<script src="https://takatick.onrender.com/takatick-embed.js"></script>
+```
+
+`data-pay-key` is your pay key (dashboard &rarr; Pay link). `data-amount` is the price in BDT (leave it out and the buyer types the amount). The widget loads your registered methods with their MFS logos, shows the number to pay, takes the TrxID and verifies it automatically — the `payment.confirmed` webhook still fires, so your server can mark the order paid. Try it live at `/embed-demo.html` (paste any pay key + amount). The hosted pay page (`/pay/<payKey>`) shows the same logo selector, and the enroll page (buying a TakaTick package) uses the same UI for the seller's numbers.
+
 ## Project tree
 
 ```
