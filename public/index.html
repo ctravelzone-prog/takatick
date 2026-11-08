@@ -129,8 +129,7 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
           <label>Name</label><input name="name" required>
           <label>Email</label><input name="email" type="email" required>
           <label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
-          <label>Package</label>
-          <select name="package" id="pkgSelect"></select>
+          <p style="font-size:14px;color:#666">Selected plan: <strong id="signupPlan"></strong> — you can change it in the next step.</p>
           <button class="btn" type="submit" style="width:100%">Create account</button>
         </form>
         <p style="color:#666;font-size:14px">Already have an account? <a href="/login.html">Log in</a> — then buy or renew from your dashboard.</p>
@@ -211,13 +210,17 @@ async function loadPricing(){
       </ul>
       <button class="btn" style="width:100%" onclick="choosePackage('${p.id}')">Choose ${p.name}</button>
     </div>`).join('');
-  document.getElementById('pkgSelect').innerHTML = pkgs.map(p =>
-    `<option value="${p.id}" ${p.id===selectedPackage?'selected':''}>${p.name} — ৳${p.priceBDT}/mo</option>`).join('');
+  updateSignupPlan();
   updatePayStep();
+}
+function updateSignupPlan(){
+  const p = pkgById(selectedPackage);
+  const el = document.getElementById('signupPlan');
+  if(p && el) el.textContent = p.name + ' — ৳' + p.priceBDT + '/mo';
 }
 function choosePackage(id){
   selectedPackage = id;
-  document.getElementById('pkgSelect').value = id;
+  updateSignupPlan();
   showEnroll();
 }
 function setEnrollTitle(t, s){
@@ -275,11 +278,10 @@ async function post(url, body, token){
   const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', ...(token?{Authorization:'Bearer '+token}:{})}, body: JSON.stringify(body)});
   return r.json();
 }
-document.getElementById('pkgSelect').addEventListener('change', e => { selectedPackage = e.target.value; updatePayStep(); });
 document.getElementById('signupForm').addEventListener('submit', async e => {
   e.preventDefault();
   const f = new FormData(e.target);
-  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: f.get('package')});
+  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: selectedPackage});
   if(!o.ok){ showErr(o); return; }
   const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});
   if(!login.ok){ msg.textContent = 'Account created. Please log in.'; return; }

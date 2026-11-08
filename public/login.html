@@ -28,12 +28,6 @@ button{width:100%;padding:11px;border:0;border-radius:8px;background:#111;color:
 <label>Name</label><input name="name" required>
 <label>Email</label><input name="email" type="email" required>
 <label>Password (min 8 characters)</label><input name="password" type="password" minlength="8" required>
-<label>Package</label>
-<select name="package" style="width:100%;padding:10px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px">
-<option value="basic">Basic — ৳300/mo</option>
-<option value="standard">Standard — ৳600/mo</option>
-<option value="premium">Premium — ৳900/mo</option>
-</select>
 <button type="submit">Create account</button>
 </form>
 <p class="muted">On signup your account is pending — pay by bKash and submit the TrxID from the home page; admin approves and your package activates for 30 days.</p>
@@ -56,7 +50,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
 document.getElementById('signupForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const f = new FormData(e.target);
-  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password'), package: f.get('package')});
+  const o = await post('/api/auth/signup', {name: f.get('name'), email: f.get('email'), password: f.get('password')});
   if(o.ok){
     alert('Account created!\nAPI key: '+o.apiKey+'\nApp key: '+o.appKey+'\nPay key: '+o.payKey+'\nWebhook secret: '+o.webhookSecret+'\n\nSave these now — they are shown once.');
     const login = await post('/api/auth/login', {email: f.get('email'), password: f.get('password')});

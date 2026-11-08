@@ -434,6 +434,16 @@ test('landing + login pages: logged-in nav hooks present', async () => {
   const login = await req('/login.html');
   assert.match(login.text, /location\.href='\/dashboard\.html'/);
   assert.match(login.text, /location\.href='\/\#pricing'/);
+  // Standard flow: account creation asks for name/email/password only —
+  // no plan/price selection at signup (plan is chosen in the wizard).
+  assert.doesNotMatch(login.text, /name="package"/);
+});
+
+test('signup step asks no plan: no package dropdown, selected plan shown as text', async () => {
+  const home = await req('/');
+  assert.doesNotMatch(home.text, /id="pkgSelect"/);
+  assert.match(home.text, /id="signupPlan"/);
+  assert.match(home.text, /Selected plan:/);
 });
 
 test('enroll is a stepped wizard: hidden until a plan is chosen', async () => {
