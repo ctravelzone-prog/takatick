@@ -592,9 +592,15 @@ test('v1.8 logo + hero + favicon: files exist and pages reference them', async (
   assert.match(home.text, /Space Grotesk/);
   // v2.9.9: hero is an inline animated SVG (phone SMS -> drawn check), not hero.png
   // v2.9.10: detailed hero — SMS thread, receipt card, webhook chip
+  // v2.9.11: simple v2.9.9 animation back in the hero; detailed one moved
+  //   into a "How a payment gets verified" section below the hero
   assert.match(home.text, /<svg[^>]*viewBox="0 0 800 534"/);
   assert.match(home.text, /heroCheckOnce/);
+  assert.match(home.text, /hero-check1/);
+  assert.match(home.text, /Payment verified/);
   assert.match(home.text, /✓ Verified/);
+  assert.match(home.text, /id="how-it-works"/);
+  assert.match(home.text, /How a payment gets verified/);
   assert.match(home.text, /TrxID 9KX2M4PQ/);
   assert.match(home.text, /Order #ORD-1042/);
   assert.match(home.text, /payment\.confirmed/);

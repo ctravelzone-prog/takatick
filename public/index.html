@@ -44,7 +44,10 @@ header{position:sticky;top:0;background:rgba(255,255,255,.88);backdrop-filter:bl
 .hero-trust{font-size:14px;color:#8FA3B5;margin:22px 0 0}
 .hero-img img{width:100%;height:auto;border-radius:20px;display:block;box-shadow:0 24px 60px rgba(0,0,0,.45)}
 .hero-img svg{width:100%;height:auto;border-radius:20px;display:block;box-shadow:0 24px 60px rgba(0,0,0,.45)}
-.hero-img svg .anim{transform-box:fill-box}
+.flow-img{max-width:860px;margin:0 auto}
+.flow-img svg{width:100%;height:auto;border-radius:20px;display:block;box-shadow:0 24px 60px rgba(10,27,46,.12)}
+.hero-img svg .anim,.flow-img svg .anim{transform-box:fill-box}
+@keyframes heroCheckOnce1{from{stroke-dashoffset:130}to{stroke-dashoffset:0}}
 @keyframes heroFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @keyframes heroSms{0%{opacity:0;transform:translateY(12px)}8%{opacity:1;transform:translateY(0)}75%{opacity:1;transform:translateY(0)}88%,100%{opacity:0;transform:translateY(-8px)}}
 @keyframes heroSms2{0%,12%{opacity:0;transform:translateY(12px)}22%{opacity:1;transform:translateY(0)}78%{opacity:1;transform:translateY(0)}90%,100%{opacity:0;transform:translateY(-8px)}}
@@ -65,6 +68,7 @@ header{position:sticky;top:0;background:rgba(255,255,255,.88);backdrop-filter:bl
 .hero-flow{animation:heroDash 1s linear infinite}
 .hero-ring{animation:heroPulse 2.4s ease-out infinite;transform-origin:center}
 .hero-check{stroke-dasharray:100;animation:heroCheckOnce 1.2s .5s ease-in-out both}
+.hero-check1{stroke-dasharray:130;animation:heroCheckOnce1 1.2s .6s ease-in-out both}
 .hero-coin{animation:heroCoin 3.4s ease-in-out infinite;transform-origin:center}
 .hero-coin.d2{animation-delay:.9s}
 .hero-coin.d3{animation-delay:1.7s}
@@ -72,7 +76,7 @@ header{position:sticky;top:0;background:rgba(255,255,255,.88);backdrop-filter:bl
 .hero-bar.d2{animation-delay:.5s}
 .hero-bar.d3{animation-delay:1s}
 .hero-pop{animation:heroPopOnce .8s 1.3s ease-out both;transform-origin:center}
-@media (prefers-reduced-motion:reduce){.hero-img svg .anim,.hero-float,.hero-sms,.hero-sms2,.hero-receipt,.hero-webhook,.hero-dot,.hero-flow,.hero-ring,.hero-check,.hero-coin,.hero-bar,.hero-pop{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.hero-img svg .anim,.flow-img svg .anim,.hero-float,.hero-sms,.hero-sms2,.hero-receipt,.hero-webhook,.hero-dot,.hero-flow,.hero-ring,.hero-check,.hero-check1,.hero-coin,.hero-bar,.hero-pop{animation:none!important}}
 section{padding:56px 0}
 section h2{font-size:30px;margin:0 0 8px;text-align:center;color:var(--navy)}
 section .sub{color:var(--muted);text-align:center;max-width:640px;margin:0 auto 32px;line-height:1.6}
@@ -177,13 +181,71 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
       </div>
       <p class="hero-trust">No per-transaction fee &nbsp;·&nbsp; Your money stays with you &nbsp;·&nbsp; Automatic verification</p>
     </div>
-    <div class="hero-img"><svg viewBox="0 0 800 534" role="img" aria-label="A payment SMS on a phone turning into a verified checkmark, then a paid order" xmlns="http://www.w3.org/2000/svg">
+    <div class="hero-img"><svg viewBox="0 0 800 534" role="img" aria-label="A payment SMS on a phone turning into a verified checkmark" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="gBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#E9F5F3"/></linearGradient>
         <linearGradient id="gTeal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14B8A6"/><stop offset="1" stop-color="#0D9488"/></linearGradient>
         <radialGradient id="gGold" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#FFD95E"/><stop offset="1" stop-color="#F0A500"/></radialGradient>
       </defs>
       <rect width="800" height="534" rx="24" fill="url(#gBg)"/>
+      <circle cx="700" cy="80" r="110" fill="#0D9488" opacity=".08"/>
+      <circle cx="110" cy="470" r="90" fill="#0D9488" opacity=".07"/>
+      <g fill="#0D9488" opacity=".25"><circle cx="330" cy="52" r="4"/><circle cx="360" cy="52" r="4"/><circle cx="390" cy="52" r="4"/><circle cx="330" cy="76" r="4"/><circle cx="360" cy="76" r="4"/><circle cx="390" cy="76" r="4"/></g>
+      <!-- phone -->
+      <g class="anim hero-float">
+        <rect x="64" y="96" width="176" height="336" rx="30" fill="#0A1B2E"/>
+        <rect x="76" y="116" width="152" height="296" rx="20" fill="#CFEDE8"/>
+        <rect x="128" y="128" width="48" height="8" rx="4" fill="#0A1B2E" opacity=".25"/>
+        <g class="anim hero-sms">
+          <rect x="88" y="150" width="128" height="82" rx="12" fill="#ffffff"/>
+          <circle cx="102" cy="168" r="7" fill="#0D9488"/>
+          <text x="116" y="173" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0A1B2E">bKash</text>
+          <text x="100" y="204" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="#0D9488">৳1,500</text>
+          <text x="100" y="222" font-family="system-ui,sans-serif" font-size="11" fill="#3D4E5E">TrxID verified ✓</text>
+        </g>
+        <rect x="88" y="246" width="128" height="42" rx="10" fill="#ffffff" opacity=".85"/>
+        <text x="100" y="272" font-family="system-ui,sans-serif" font-size="12" fill="#3D4E5E">Send Money • ৳1,500</text>
+        <rect x="128" y="396" width="48" height="6" rx="3" fill="#0A1B2E" opacity=".25"/>
+      </g>
+      <!-- flow phone -> check -->
+      <path d="M 250 272 C 330 272, 350 250, 428 246" fill="none" stroke="#0D9488" stroke-width="3" stroke-dasharray="7 7" class="anim hero-flow" opacity=".7"/>
+      <circle r="7" fill="#0D9488"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 250 272 C 330 272, 350 250, 428 246"/></circle>
+      <!-- verified check -->
+      <circle cx="580" cy="250" r="92" fill="none" stroke="#14B8A6" stroke-width="3" class="anim hero-ring"/>
+      <circle cx="580" cy="250" r="88" fill="url(#gTeal)"/>
+      <path d="M 536 252 l 30 32 l 58 -64" fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" class="anim hero-check1"/>
+      <g class="anim hero-pop">
+        <rect x="470" y="356" width="220" height="46" rx="23" fill="#0A1B2E"/>
+        <text x="580" y="386" text-anchor="middle" font-family="system-ui,sans-serif" font-size="17" font-weight="700" fill="#ffffff">✓ Payment verified</text>
+      </g>
+      <!-- mini chart -->
+      <g>
+        <rect x="608" y="64" width="140" height="96" rx="14" fill="#ffffff"/>
+        <rect x="628" y="112" width="18" height="34" rx="4" fill="#14B8A6" class="anim hero-bar"/>
+        <rect x="656" y="98" width="18" height="48" rx="4" fill="#0D9488" class="anim hero-bar d2"/>
+        <rect x="684" y="84" width="18" height="62" rx="4" fill="#0A1B2E" class="anim hero-bar d3"/>
+        <text x="622" y="88" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#5B6B7A">Today</text>
+      </g>
+      <!-- floating coins -->
+      <g class="anim hero-coin"><circle cx="706" cy="430" r="21" fill="url(#gGold)"/><text x="706" y="438" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#7A5200">৳</text></g>
+      <g class="anim hero-coin d2"><circle cx="120" cy="478" r="16" fill="url(#gGold)"/><text x="120" y="484" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#7A5200">৳</text></g>
+      <g class="anim hero-coin d3"><circle cx="352" cy="66" r="16" fill="url(#gGold)"/><text x="352" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#7A5200">৳</text></g>
+    </svg></div>
+  </div>
+</div>
+
+
+<section id="how-it-works">
+  <div class="wrap">
+    <h2>How a payment gets verified</h2>
+    <p class="sub">SMS ase &rarr; TakaTick verify kore &rarr; order Paid hoy &rarr; tomar site-e webhook jay. Sob automatic.</p>
+    <div class="flow-img"><div class="hero-img"><svg viewBox="0 0 800 534" role="img" aria-label="A payment SMS on a phone turning into a verified checkmark, then a paid order" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gBg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#E9F5F3"/></linearGradient>
+        <linearGradient id="gTeal2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14B8A6"/><stop offset="1" stop-color="#0D9488"/></linearGradient>
+        <radialGradient id="gGold2" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#FFD95E"/><stop offset="1" stop-color="#F0A500"/></radialGradient>
+      </defs>
+      <rect width="800" height="534" rx="24" fill="url(#gBg2)"/>
       <circle cx="700" cy="80" r="110" fill="#0D9488" opacity=".08"/>
       <circle cx="110" cy="480" r="90" fill="#0D9488" opacity=".07"/>
       <g fill="#0D9488" opacity=".25"><circle cx="260" cy="44" r="4"/><circle cx="285" cy="44" r="4"/><circle cx="310" cy="44" r="4"/></g>
@@ -218,7 +280,7 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
       <circle r="7" fill="#0D9488"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 246 260 C 300 260, 312 240, 360 236"/></circle>
       <!-- verified check -->
       <circle cx="440" cy="220" r="74" fill="none" stroke="#14B8A6" stroke-width="3" class="anim hero-ring"/>
-      <circle cx="440" cy="220" r="70" fill="url(#gTeal)"/>
+      <circle cx="440" cy="220" r="70" fill="url(#gTeal2)"/>
       <path d="M 412 220 l 20 22 l 40 -44" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" class="anim hero-check"/>
       <g class="anim hero-pop">
         <rect x="375" y="300" width="130" height="38" rx="19" fill="#0A1B2E"/>
@@ -255,12 +317,12 @@ footer .cols{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between}
         <rect x="672" y="104" width="18" height="46" rx="4" fill="#0A1B2E" class="anim hero-bar d3"/>
       </g>
       <!-- floating coins -->
-      <g class="anim hero-coin"><circle cx="712" cy="492" r="16" fill="url(#gGold)"/><text x="712" y="498" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#7A5200">৳</text></g>
-      <g class="anim hero-coin d2"><circle cx="348" cy="56" r="15" fill="url(#gGold)"/><text x="348" y="61" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#7A5200">৳</text></g>
-      <g class="anim hero-coin d3"><circle cx="566" cy="336" r="14" fill="url(#gGold)"/><text x="566" y="341" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#7A5200">৳</text></g>
-    </svg></div>
+      <g class="anim hero-coin"><circle cx="712" cy="492" r="16" fill="url(#gGold2)"/><text x="712" y="498" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#7A5200">৳</text></g>
+      <g class="anim hero-coin d2"><circle cx="348" cy="56" r="15" fill="url(#gGold2)"/><text x="348" y="61" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#7A5200">৳</text></g>
+      <g class="anim hero-coin d3"><circle cx="566" cy="336" r="14" fill="url(#gGold2)"/><text x="566" y="341" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#7A5200">৳</text></g>
+    </svg></div></div>
   </div>
-</div>
+</section>
 
 <section id="features">
   <div class="wrap">
