@@ -590,17 +590,13 @@ test('v1.8 logo + hero + favicon: files exist and pages reference them', async (
   assert.match(home.text, /\/images\/logo\.png/);
   assert.match(home.text, /hero-grid/);
   assert.match(home.text, /Space Grotesk/);
-  // v2.9.9: hero is an inline animated SVG (phone SMS -> drawn check), not hero.png
-  // v2.9.10: detailed hero — SMS thread, receipt card, webhook chip
-  // v2.9.11: simple v2.9.9 animation back in the hero; detailed one moved
-  //   into a "How a payment gets verified" section below the hero
-  // v2.9.12: hero is an ANIMATED version of the original hand+phone
-  //   illustration (swoosh, big check, charts, checklist, coins)
+  // v2.9.13: hero is the EXACT original hero.png again (v1.8 file,
+  //   restored from git), animated with a gentle CSS float + zoom.
+  //   The how-it-works section below keeps the detailed v2.9.10
+  //   animated SVG (SMS thread, receipt, webhook).
+  assert.match(home.text, /<img src="\/images\/hero\.png"/);
+  assert.match(home.text, /heroImgFloat/);
   assert.match(home.text, /<svg[^>]*viewBox="0 0 800 534"/);
-  assert.match(home.text, /hero-swoosh/);
-  assert.match(home.text, /hero-check-big/);
-  assert.match(home.text, /hero-tick/);
-  assert.match(home.text, /hero-line/);
   assert.match(home.text, /heroCheckOnce/);
   assert.match(home.text, /✓ Verified/);
   assert.match(home.text, /id="how-it-works"/);
@@ -609,7 +605,7 @@ test('v1.8 logo + hero + favicon: files exist and pages reference them', async (
   assert.match(home.text, /Order #ORD-1042/);
   assert.match(home.text, /payment\.confirmed/);
   assert.match(home.text, /Listening/);
-  for (const p of ['/images/logo.png', '/favicon.png', '/images/feature-sms.png']) {
+  for (const p of ['/images/logo.png', '/images/hero.png', '/favicon.png', '/images/feature-sms.png']) {
     const r = await req(p);
     assert.equal(r.status, 200, `${p} status ${r.status}`);
   }
