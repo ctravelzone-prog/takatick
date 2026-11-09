@@ -588,10 +588,13 @@ test('enroll is a stepped wizard on its own page: landing has none, /enroll.html
 test('v1.8 logo + hero + favicon: files exist and pages reference them', async () => {
   const home = await req('/');
   assert.match(home.text, /\/images\/logo\.png/);
-  assert.match(home.text, /\/images\/hero\.png/);
   assert.match(home.text, /hero-grid/);
   assert.match(home.text, /Space Grotesk/);
-  for (const p of ['/images/logo.png', '/images/hero.png', '/favicon.png', '/images/feature-sms.png']) {
+  // v2.9.9: hero is an inline animated SVG (phone SMS -> drawn check), not hero.png
+  assert.match(home.text, /<svg[^>]*viewBox="0 0 800 534"/);
+  assert.match(home.text, /heroCheckOnce/);
+  assert.match(home.text, /Payment verified/);
+  for (const p of ['/images/logo.png', '/favicon.png', '/images/feature-sms.png']) {
     const r = await req(p);
     assert.equal(r.status, 200, `${p} status ${r.status}`);
   }
@@ -1051,4 +1054,25 @@ test('v2.9.3: enroll offers every seller method with a number (bKash/Nagad/Upay,
   assert.match(enroll.text, /payMethodDetail/);
   assert.match(enroll.text, /backToPayMethods/);
   assert.match(enroll.text, /ট্রানজেকশন আইডি দিন/);
+});
+
+test('v2.9.9: dashboard Profile & package uses pills + gradient banner; Keys use rows with Copy/Show', async () => {
+  const d = await req('/dashboard.html');
+  assert.equal(d.status, 200);
+  // Profile & package: labeled rows + method pills + gradient package hero
+  assert.match(d.text, /class="kv"/);
+  assert.match(d.text, /methodPills/);
+  assert.match(d.text, /m-pill m-/);
+  assert.match(d.text, /pkg-hero/);
+  assert.match(d.text, /pill-active/);
+  assert.match(d.text, /No expiry date — lifetime/);
+  // Keys & pay link: per-key rows with ids the Show buttons can target + Copy
+  assert.match(d.text, /class="key-row"/);
+  assert.match(d.text, /id="apikey"/);
+  assert.match(d.text, /id="appkey"/);
+  assert.match(d.text, /id="whsecret"/);
+  assert.match(d.text, /id="paylink"/);
+  assert.match(d.text, /copyText\('apikey', this\)/);
+  assert.match(d.text, /async function copyText/);
+  assert.match(d.text, /✓ Copied/);
 });

@@ -513,9 +513,10 @@ test('v2.2.2: webhook secret gated until activation, masked in profile, revealed
   assert.match(sec.json.webhookSecret, /^[0-9a-f]{64}$/);
   assert.ok(prof2.json.webhookSecretMasked.startsWith(sec.json.webhookSecret.slice(0, 8)));
   assert.ok(prof2.json.webhookSecretMasked.endsWith(sec.json.webhookSecret.slice(-4)));
-  // Dashboard offers the reveal button.
+  // Dashboard offers the reveal button (per-row Show on the webhook-secret row).
   const dash = await req('/dashboard.html');
-  assert.match(dash.text, /Show webhook secret/);
+  assert.match(dash.text, /onclick="showWebhookSecret\(\)"/);
+  assert.match(dash.text, /async function showWebhookSecret/);
 });
 
 test('v2.4: phone required at signup, stored, visible to admin', async () => {

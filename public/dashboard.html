@@ -46,6 +46,21 @@ code{background:#EEF3F4;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere
 .dl-btns button{margin-top:0}
 button.ghost{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
 button.ghost:hover{background:var(--teal-soft)}
+.pkg-hero{background:linear-gradient(135deg,#0A1B2E,#0D9488);color:#fff;border-radius:14px;padding:18px 20px}
+.pkg-hero .pkg-name{font-family:'Space Grotesk',system-ui,sans-serif;font-size:22px;font-weight:700}
+.pkg-hero .pkg-price{font-size:15px;opacity:.9;margin-top:2px}
+.pkg-hero .pkg-meta{margin-top:8px;font-size:14px;opacity:.92}
+.pill-active{display:inline-block;background:#fff;color:#0B7C72;font-size:12px;font-weight:700;border-radius:20px;padding:4px 10px;margin-left:8px;vertical-align:middle}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:8px 12px;font-size:15px;margin:0}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.m-pill{display:inline-block;font-size:12px;font-weight:700;color:#fff;border-radius:20px;padding:4px 10px;margin:0 6px 6px 0;text-transform:capitalize}
+.m-bkash{background:#e2136e}.m-nagad{background:#ed1c24}.m-rocket{background:#8c3494}.m-upay{background:#111111}
+.key-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #EEF3F4;flex-wrap:wrap}
+.key-row:last-child{border-bottom:0}
+.key-label{width:150px;font-weight:700;font-size:14px;flex-shrink:0}
+.key-row code{flex:1;min-width:180px}
+button.mini{padding:7px 12px;font-size:13px}
 .mustread{background:var(--teal-soft);border:1px solid #BFE8E2;border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14px}
 .mustread ul{margin:8px 0 0;padding-left:20px}
 .mustread li{margin-bottom:4px}
@@ -85,8 +100,7 @@ Key bosanor jayga prottek file-er uporei lekha ache — pay key button/pay file-
 <div class="card"><h2>My package orders</h2><div id="orders">Loading…</div>
 <p><button onclick="location.href='/#pricing'">Upgrade / Renew package</button></p></div>
 <div class="card" id="keysCard"><h2>Keys &amp; pay link</h2><div id="keys"></div>
-<p id="keysBtns" style="display:none"><button id="regenBtn" onclick="regenKey()">Regenerate API key</button> <button onclick="showApiKey()">Show API key</button> <button onclick="showAppKey()">Show app key</button> <button onclick="showWebhookSecret()">Show webhook secret</button></p>
-<div id="appkey"></div><div id="apikey"></div><div id="whsecret"></div></div>
+<p id="keysBtns" style="display:none"><button id="regenBtn" onclick="regenKey()">Regenerate API key</button></p></div>
 <div class="card"><h2>Payment numbers</h2>
 <form id="numForm"><select name="method"><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="rocket">Rocket</option><option value="upay">Upay</option></select>
 <input name="number" placeholder="01XXXXXXXXX" required><input name="label" placeholder="Label (optional)">
@@ -128,12 +142,14 @@ async function load(){
   // from the signup-time default package.
   const waitingPkg = p.expiryState === 'pending' ? p.waitingPackage : null;
   const shownPkg = waitingPkg || (p.expiryState === 'pending' ? null : p.package);
+  const methodPills = (shownPkg && shownPkg.methods ? shownPkg.methods : []).map(x => `<span class="m-pill m-${esc(x)}">${esc(x)}</span>`).join('');
   document.getElementById('profile').innerHTML =
-    `<p><strong>${esc(m.name)}</strong> — ${esc(m.email)}<br>`+
+    `<dl class="kv"><dt>Name</dt><dd><strong>${esc(m.name)}</strong></dd>`+
+    `<dt>Email</dt><dd>${esc(m.email)}</dd>`+
     (shownPkg
-      ? `Package: <strong>${esc(shownPkg.name)}</strong> (৳${esc(shownPkg.priceBDT)}/mo)${planOff ? ' — <span style="color:#b00;font-weight:700">Plan deactivated</span>' : ''}${waitingPkg ? ' — <span style="color:#8a6d00;font-weight:700">Waiting for approval</span>' : ''}<br>Methods: ${(shownPkg.methods||[]).join(', ')}<br>`
-      : `Package: <strong>No package yet</strong> — buy one from the <a href="/#pricing">pricing page</a><br>`) +
-    `Verifications this month: ${p.usage.verificationsUsedThisMonth} / ${p.usage.verificationsLimit ?? 'unlimited'}</p>`;
+      ? `<dt>Package</dt><dd><strong>${esc(shownPkg.name)}</strong> (৳${esc(shownPkg.priceBDT)}/mo)${planOff ? ' — <span style="color:#b00;font-weight:700">Plan deactivated</span>' : ''}${waitingPkg ? ' — <span style="color:#8a6d00;font-weight:700">Waiting for approval</span>' : ''}</dd><dt>Methods</dt><dd>${methodPills || '—'}</dd>`
+      : `<dt>Package</dt><dd><strong>No package yet</strong> — buy one from the <a href="/#pricing">pricing page</a></dd>`) +
+    `<dt>Verifications</dt><dd>${p.usage.verificationsUsedThisMonth} / ${p.usage.verificationsLimit ?? 'unlimited'} this month</dd></dl>`;
   const expDate = p.packageExpiresAt ? new Date(p.packageExpiresAt).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : null;
   document.getElementById('statPackage').textContent = shownPkg ? shownPkg.name : 'No package';
   document.getElementById('statPackageSub').textContent = planOff ? 'Plan deactivated' : (shownPkg ? ('৳' + shownPkg.priceBDT + '/mo' + (waitingPkg ? ' · Waiting for approval' : '')) : 'No package yet');
@@ -162,10 +178,12 @@ async function load(){
     // automatically on login, before anything stops.
     banner = (p.daysLeft !== null && p.daysLeft <= 1)
       ? `<p style="color:#8a6d00;font-weight:700">⚠️ Tomar package kal sesh hobe — ${esc(expDate)}</p><p>Renew na korle kal theke verify, confirm, pay link — sob bondho hoye jabe. Ekhoni renew koro, tahole service bondho hobe na.</p><button onclick="location.href='/#pricing'">Renew now</button>`
-      : `<p><strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo) — Active<br>Expires: <strong>${esc(expDate)}</strong> (${p.daysLeft} day(s) left)</p>`;
+      : `<div class="pkg-hero"><span class="pkg-name">${esc(p.package.name)}</span><span class="pill-active">● Active</span><div class="pkg-price">৳${esc(p.package.priceBDT)}/mo</div><div class="pkg-meta">Expires: <strong>${esc(expDate)}</strong> (${p.daysLeft} day(s) left)</div></div>`;
     if (p.daysLeft !== null && p.daysLeft <= 1) document.getElementById('pkgBanner').style.borderLeftColor = '#c9a227';
+    else document.getElementById('pkgBanner').style.borderLeftColor = '#0D9488';
   } else {
-    banner = `<p><strong>${esc(p.package.name)}</strong> (৳${esc(p.package.priceBDT)}/mo) — Active<br>No expiry date.</p>`;
+    banner = `<div class="pkg-hero"><span class="pkg-name">${esc(p.package.name)}</span><span class="pill-active">● Active</span><div class="pkg-price">৳${esc(p.package.priceBDT)}/mo</div><div class="pkg-meta">No expiry date — lifetime.</div></div>`;
+    document.getElementById('pkgBanner').style.borderLeftColor = '#0D9488';
   }
   document.getElementById('pkgStatus').innerHTML = banner;
   // v2.2: keys + downloads exist only after activation. A pending merchant
@@ -184,8 +202,10 @@ async function load(){
       `<p>⛔ <strong>Expired</strong> — API key, app key, webhook secret ar pay link ekhon kaj korbe na. Renew korle ager key-i abar cholbe.</p><button onclick="location.href='/#pricing'">Renew now</button>`;
   } else {
     document.getElementById('keys').innerHTML =
-      `<p>API key: <code>${esc(p.apiKeyMasked||'')}</code><br>App key: <code>${esc(p.appKeyMasked||'')}</code><br>Webhook secret: <code>${esc(p.webhookSecretMasked||'')}</code><br>`+
-      `Pay link: <code>${esc(location.origin)}/pay/${esc(m.pay_key)}</code></p>`;
+      `<div class="key-row"><span class="key-label">🔑 API key</span><code id="apikey">${esc(p.apiKeyMasked||'')}</code><button class="mini" onclick="copyText('apikey', this)">Copy</button><button class="mini ghost" onclick="showApiKey()">Show</button></div>`+
+      `<div class="key-row"><span class="key-label">📱 App key</span><code id="appkey">${esc(p.appKeyMasked||'')}</code><button class="mini" onclick="copyText('appkey', this)">Copy</button><button class="mini ghost" onclick="showAppKey()">Show</button></div>`+
+      `<div class="key-row"><span class="key-label">🔔 Webhook secret</span><code id="whsecret">${esc(p.webhookSecretMasked||'')}</code><button class="mini" onclick="copyText('whsecret', this)">Copy</button><button class="mini ghost" onclick="showWebhookSecret()">Show</button></div>`+
+      `<div class="key-row"><span class="key-label">🔗 Pay link</span><code id="paylink">${esc(location.origin)}/pay/${esc(m.pay_key)}</code><button class="mini" onclick="copyText('paylink', this)">Copy</button></div>`;
   }
   document.querySelector('#settingsForm [name=webhook_url]').value = m.webhook_url||'';
   document.querySelector('#settingsForm [name=success_url]').value = m.success_url||'';
@@ -230,7 +250,8 @@ async function pasteSms(){
   if(o.ok){ document.getElementById('pasteSms').value=''; load(); }
 }
 async function regenKey(){ const o = await api('/api/me/api-key/regenerate',{method:'POST',body:'{}'}); if(o.ok) alert('New API key: '+o.apiKey+'\nOld key revoked. Save it now.'); load(); }
-async function showApiKey(){ const o = await api('/api/me/api-key'); document.getElementById('apikey').textContent = o.ok ? ('API key: '+o.apiKey) : (o.error||'Failed'); }
+async function copyText(id, btn){ const el = document.getElementById(id); if(!el) return; const v = el.textContent; try{ await navigator.clipboard.writeText(v); }catch(_e){ const t = document.createElement('textarea'); t.value = v; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } if(btn){ const old = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(()=>{ btn.textContent = old; }, 1500); } }
+async function showApiKey(){ const o = await api('/api/me/api-key'); document.getElementById('apikey').textContent = o.ok ? o.apiKey : (o.error||'Failed'); }
 async function downloadFile(path, name){
   const r = await fetch(path, {headers:{Authorization:'Bearer '+token}});
   if(!r.ok){ alert('Download failed — package active thakte hobe.'); return; }
@@ -239,8 +260,8 @@ async function downloadFile(path, name){
   a.href = URL.createObjectURL(blob); a.download = name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
 }
-async function showAppKey(){ const o = await api('/api/me/app-key'); document.getElementById('appkey').textContent = o.ok ? ('App key: '+o.appKey) : (o.error||'Failed'); }
-async function showWebhookSecret(){ const o = await api('/api/me/webhook-secret'); document.getElementById('whsecret').textContent = o.ok ? ('Webhook secret: '+o.webhookSecret) : (o.error||'Failed'); }
+async function showAppKey(){ const o = await api('/api/me/app-key'); document.getElementById('appkey').textContent = o.ok ? o.appKey : (o.error||'Failed'); }
+async function showWebhookSecret(){ const o = await api('/api/me/webhook-secret'); document.getElementById('whsecret').textContent = o.ok ? o.webhookSecret : (o.error||'Failed'); }
 async function delNum(id){ await api('/api/me/numbers/'+id,{method:'DELETE'}); load(); }
 document.getElementById('numForm').addEventListener('submit', async e=>{ e.preventDefault(); const f=new FormData(e.target);
   const o = await api('/api/me/numbers',{method:'POST',body:JSON.stringify({method:f.get('method'),number:f.get('number'),label:f.get('label')})});
